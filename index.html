@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Vehicle Booking</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#1a7a3c" />
+<link rel="icon" href="logo.png" />
+<link rel="stylesheet" href="css/variables.css" />
+<link rel="stylesheet" href="css/components.css" />
+<link rel="stylesheet" href="css/login.css" />
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="page active" id="page-login">
+  <div class="login-wrap">
+    <div class="login-box">
+      <img src="logo.png" alt="Logo" class="login-logo" />
+      <div class="login-title">Vehicle Booking</div>
+      <div class="login-subtitle">Sign in to continue</div>
+      <div class="login-error" id="loginError"></div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="loginId">Employee ID</label>
+          <input type="text" id="loginId" placeholder="e.g. 1001" required />
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" placeholder="Password" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Login</button>
+      </form>
+      <div class="login-hint">Default password is your Employee ID</div>
+    </div>
+  </div>
+</div>
+
+<!-- FORCED CHANGE PASSWORD -->
+<div class="page" id="page-change-password">
+  <div class="login-wrap">
+    <div class="login-box">
+      <div class="login-title">Set New Password</div>
+      <div class="login-subtitle">This is your first login. Please set a new password.</div>
+      <div class="login-error" id="changePasswordError"></div>
+      <form id="changePasswordForm">
+        <div class="form-group">
+          <label for="newPassword">New Password</label>
+          <input type="password" id="newPassword" required />
+        </div>
+        <div class="form-group">
+          <label for="confirmPassword">Confirm Password</label>
+          <input type="password" id="confirmPassword" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Save Password</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- EMPLOYEE HOME -->
+<div class="page" id="page-employee-home">
+  <div class="header">
+    <div class="header-left">
+      <img src="logo.png" class="header-logo" alt="Logo" />
+      <div>
+        <div class="header-title">My Bookings</div>
+        <div class="header-sub" id="employeeHeaderName"></div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline btn-small" data-logout>Logout</button>
+    </div>
+  </div>
+  <div class="container">
+    <div id="myBookingsList"></div>
+  </div>
+  <button class="fab-add" id="newBookingFab" title="New booking request">+</button>
+</div>
+
+<!-- DRIVER HOME (placeholder, out of scope for Sprint 1 detail) -->
+<div class="page" id="page-driver-home">
+  <div class="header">
+    <div class="header-left">
+      <img src="logo.png" class="header-logo" alt="Logo" />
+      <div class="header-title">Driver</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline btn-small" data-logout>Logout</button>
+    </div>
+  </div>
+  <div class="container">
+    <div class="card">
+      <div class="card-title">Assigned Trips</div>
+      <div class="empty-state">Driver trip view coming in a later sprint.</div>
+    </div>
+  </div>
+</div>
+
+<!-- FLEET MANAGER HOME -->
+<div class="page" id="page-fleet-home">
+  <div class="header">
+    <div class="header-left">
+      <img src="logo.png" class="header-logo" alt="Logo" />
+      <div class="header-title">Fleet Manager</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline btn-small" data-logout>Logout</button>
+    </div>
+  </div>
+  <div class="container">
+    <div class="tab-bar">
+      <button class="admin-tab-btn active" data-admin-tab="fleetPendingPanel">Pending Requests</button>
+      <button class="admin-tab-btn" data-admin-tab="fleetApprovedPanel">Approved Bookings</button>
+    </div>
+
+    <div class="admin-tab-panel active" id="fleetPendingPanel">
+      <div id="pendingBookingsList"></div>
+    </div>
+
+    <div class="admin-tab-panel" id="fleetApprovedPanel">
+      <div id="approvedBookingsList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN HOME -->
+<div class="page" id="page-admin-home">
+  <div class="header">
+    <div class="header-left">
+      <img src="logo.png" class="header-logo" alt="Logo" />
+      <div class="header-title">Admin Dashboard</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline btn-small" data-logout>Logout</button>
+    </div>
+  </div>
+  <div class="container">
+    <div class="tab-bar">
+      <button class="admin-tab-btn active" data-admin-tab="adminUsersPanel">Users</button>
+      <button class="admin-tab-btn" data-admin-tab="adminVehiclesPanel">Vehicles</button>
+      <button class="admin-tab-btn" data-admin-tab="adminDriversPanel">Drivers</button>
+    </div>
+
+    <div class="admin-tab-panel active" id="adminUsersPanel">
+      <div class="card">
+        <div class="card-title">Users</div>
+        <button class="btn btn-primary btn-small" id="addUserBtn" style="margin-bottom:12px;">+ Add User</button>
+        <div class="table-wrap">
+          <table class="records-table">
+            <thead>
+              <tr><th>ID</th><th>Name</th><th>Role</th><th>Contact</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="adminUsersTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-tab-panel" id="adminVehiclesPanel">
+      <div class="card">
+        <div class="card-title">Vehicles</div>
+        <button class="btn btn-primary btn-small" id="addVehicleBtn" style="margin-bottom:12px;">+ Add Vehicle</button>
+        <div class="table-wrap">
+          <table class="records-table">
+            <thead>
+              <tr><th>ID</th><th>Name</th><th>Registration</th><th>Capacity</th><th>Type</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="adminVehiclesTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-tab-panel" id="adminDriversPanel">
+      <div class="card">
+        <div class="card-title">Drivers</div>
+        <button class="btn btn-primary btn-small" id="addDriverBtn" style="margin-bottom:12px;">+ Add Driver</button>
+        <div class="table-wrap">
+          <table class="records-table">
+            <thead>
+              <tr><th>ID</th><th>Name</th><th>Contact</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="adminDriversTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: New Booking -->
+<div class="modal-overlay" id="newBookingModal">
+  <div class="modal">
+    <button class="modal-close" data-close-modal="newBookingModal">&times;</button>
+    <div class="modal-title">Request a Vehicle</div>
+    <form id="bookingForm">
+      <div class="form-group">
+        <label for="bookingDate">Date</label>
+        <input type="date" id="bookingDate" required />
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label for="bookingFromTime">From</label>
+          <input type="time" id="bookingFromTime" required />
+        </div>
+        <div class="form-group">
+          <label for="bookingToTime">To</label>
+          <input type="time" id="bookingToTime" required />
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="bookingPurpose">Purpose</label>
+        <input type="text" id="bookingPurpose" placeholder="e.g. Client visit" required />
+      </div>
+      <div class="form-group">
+        <label for="bookingPeople">Number of People</label>
+        <input type="number" id="bookingPeople" min="1" required />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Submit Request</button>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: Cancel Booking -->
+<div class="modal-overlay" id="cancelBookingModal">
+  <div class="modal">
+    <button class="modal-close" data-close-modal="cancelBookingModal">&times;</button>
+    <div class="modal-title">Cancel Booking</div>
+    <p style="margin-bottom:16px; color: var(--muted);">Are you sure you want to cancel this booking request?</p>
+    <button class="btn btn-danger btn-block" id="cancelBookingConfirmBtn">Yes, Cancel Booking</button>
+  </div>
+</div>
+
+<!-- MODAL: Approve Booking -->
+<div class="modal-overlay" id="approvalModal">
+  <div class="modal">
+    <button class="modal-close" data-close-modal="approvalModal">&times;</button>
+    <div class="modal-title">Approve Booking</div>
+    <div class="form-group">
+      <label for="approveVehicleSelect">Vehicle</label>
+      <select id="approveVehicleSelect"></select>
+    </div>
+    <div class="form-group">
+      <label for="approveDriverSelect">Driver</label>
+      <select id="approveDriverSelect"></select>
+    </div>
+    <button class="btn btn-primary btn-block" id="approvalConfirmBtn">Approve & Assign</button>
+  </div>
+</div>
+
+<!-- MODAL: Reject Booking -->
+<div class="modal-overlay" id="rejectionModal">
+  <div class="modal">
+    <button class="modal-close" data-close-modal="rejectionModal">&times;</button>
+    <div class="modal-title">Reject Booking</div>
+    <div class="form-group">
+      <label for="rejectReasonInput">Reason</label>
+      <textarea id="rejectReasonInput" placeholder="Enter reason for rejection"></textarea>
+    </div>
+    <button class="btn btn-danger btn-block" id="rejectionConfirmBtn">Reject Booking</button>
+  </div>
+</div>
+
+<!-- MODAL: User (add/edit) -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <button class="modal-close" data-close-modal="userModal">&times;</button>
+    <div class="modal-title" id="userModalTitle">Add User</div>
+    <form id="userForm">
+      <div class="form-group">
+        <label for="userIdInput">Employee ID</label>
+        <input type="text" id="userIdInput" required />
+      </div>
+      <div class="form-group">
+        <label for="userNameInput">Name</label>
+        <input type="text" id="userNameInput" required />
+      </div>
+      <div class="form-group">
+        <label for="userRoleInput">Role</label>
+        <select id="userRoleInput">
+          <option value="employee">Employee</option>
+          <option value="driver">Driver</option>
+          <option value="fleetmanager">Fleet Manager</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="userContactInput">Contact</label>
+        <input type="text" id="userContactInput" />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Save User</button>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: Vehicle (add/edit) -->
+<div class="modal-overlay" id="vehicleModal">
+  <div class="modal">
+    <button class="modal-close" data-close-modal="vehicleModal">&times;</button>
+    <div class="modal-title" id="vehicleModalTitle">Add Vehicle</div>
+    <form id="vehicleForm">
+      <div class="form-group">
+        <label for="vehicleIdInput">Vehicle ID</label>
+        <input type="text" id="vehicleIdInput" placeholder="Auto-generated" disabled />
+      </div>
+      <div class="form-group">
+        <label for="vehicleNameInput">Name</label>
+        <input type="text" id="vehicleNameInput" required />
+      </div>
+      <div class="form-group">
+        <label for="vehicleRegInput">Registration</label>
+        <input type="text" id="vehicleRegInput" required />
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label for="vehicleCapacityInput">Capacity</label>
+          <input type="number" id="vehicleCapacityInput" min="1" />
+        </div>
+        <div class="form-group">
+          <label for="vehicleTypeInput">Type</label>
+          <input type="text" id="vehicleTypeInput" placeholder="e.g. SUV" />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Save Vehicle</button>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: Driver (add/edit) -->
+<div class="modal-overlay" id="driverModal">
+  <div class="modal">
+    <button class="modal-close" data-close-modal="driverModal">&times;</button>
+    <div class="modal-title" id="driverModalTitle">Add Driver</div>
+    <form id="driverForm">
+      <div class="form-group">
+        <label for="driverIdInput">Driver ID</label>
+        <input type="text" id="driverIdInput" placeholder="Auto-generated" disabled />
+      </div>
+      <div class="form-group">
+        <label for="driverNameInput">Name</label>
+        <input type="text" id="driverNameInput" required />
+      </div>
+      <div class="form-group">
+        <label for="driverContactInput">Contact</label>
+        <input type="text" id="driverContactInput" />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Save Driver</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast-message" id="toast"></div>
+
+<script src="js/config.js"></script>
+<script src="js/state.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/navigation.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/booking.js"></script>
+<script src="js/fleet.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/events.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
