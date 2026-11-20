@@ -40,10 +40,10 @@ body.page-is-admin .container {
 }
 
 .header-logo {
-  width: 36px;
+  width: auto;
   height: 36px;
-  border-radius: 8px;
-  object-fit: cover;
+  max-width: 100px;
+  object-fit: contain;
   background: var(--white);
 }
 
