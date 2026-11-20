@@ -23,116 +23,100 @@ function requireRole(userId, allowedRoles) {
   return { success: true, user: user };
 }
 
-// Every GET wraps its result in {success, <key>: ...} — the frontend reads
+// All requests arrive as GET with action + params in the query string.
+// Apps Script's POST redirect hop (script.google.com -> googleusercontent.com)
+// drops CORS headers, which browsers block silently as a generic fetch failure,
+// so GET-with-query-string is used everywhere instead of a JSON POST body.
+// Every response wraps its result in {success, <key>: ...} — the frontend reads
 // result.bookings/vehicles/drivers/employees/user, never a bare array/object.
 function doGet(e) {
-  const action = e.parameter.action;
+  const p = e.parameter;
+  const action = p.action;
   try {
     switch (action) {
       case 'getUserById':
-        return jsonResponse({ success: true, user: getUserById(e.parameter.id) });
+        return jsonResponse({ success: true, user: getUserById(p.id) });
       case 'getEmployees':
         return jsonResponse({ success: true, employees: getEmployees() });
       case 'getVehicles':
         return jsonResponse({ success: true, vehicles: getVehicles() });
       case 'getVehicleById':
-        return jsonResponse({ success: true, vehicle: getVehicleById(e.parameter.id) });
+        return jsonResponse({ success: true, vehicle: getVehicleById(p.id) });
       case 'getDrivers':
         return jsonResponse({ success: true, drivers: getDrivers() });
       case 'getDriverById':
-        return jsonResponse({ success: true, driver: getDriverById(e.parameter.id) });
+        return jsonResponse({ success: true, driver: getDriverById(p.id) });
       case 'getPendingBookings':
         return jsonResponse({ success: true, bookings: getPendingBookings() });
       case 'getApprovedBookings':
         return jsonResponse({ success: true, bookings: getApprovedBookings() });
       case 'getMyBookings':
-        return jsonResponse({ success: true, bookings: getMyBookings(e.parameter.employeeId) });
+        return jsonResponse({ success: true, bookings: getMyBookings(p.employeeId) });
       case 'getBookingById':
-        return jsonResponse({ success: true, booking: getBookingById(e.parameter.id) });
-      default:
-        return jsonResponse({ success: false, error: 'Unknown action: ' + action });
-    }
-  } catch (err) {
-    return jsonResponse({ success: false, error: err.toString() });
-  }
-}
-
-// Role-gated writes carry `actorId` (the logged-in user's own id) separately from
-// any record id being acted on, and the server re-derives the actor's name from
-// their own record (approvedBy/rejectedBy) rather than trusting a client-sent name.
-function doPost(e) {
-  let body;
-  try {
-    body = JSON.parse(e.postData.contents);
-  } catch (err) {
-    return jsonResponse({ success: false, error: 'Invalid JSON body' });
-  }
-  const action = body.action;
-  try {
-    switch (action) {
+        return jsonResponse({ success: true, booking: getBookingById(p.id) });
       case 'login':
-        return jsonResponse(loginUser(body.id, body.password));
+        return jsonResponse(loginUser(p.id, p.password));
       case 'changePassword':
-        return jsonResponse(changePassword(body.id, body.oldPassword, body.newPassword));
+        return jsonResponse(changePassword(p.id, p.oldPassword, p.newPassword));
       case 'createUser': {
-        const auth = requireRole(body.actorId, ['admin']);
+        const auth = requireRole(p.actorId, ['admin']);
         if (!auth.success) return jsonResponse(auth);
-        return jsonResponse(createUser(body.id, body.name, body.role, body.contact, body.telegramId));
+        return jsonResponse(createUser(p.id, p.name, p.role, p.contact, p.telegramId));
       }
       case 'updateUser': {
-        const auth = requireRole(body.actorId, ['admin']);
+        const auth = requireRole(p.actorId, ['admin']);
         if (!auth.success) return jsonResponse(auth);
-        return jsonResponse(updateUser(body.id, { name: body.name, role: body.role, contact: body.contact }));
+        return jsonResponse(updateUser(p.id, { name: p.name, role: p.role, contact: p.contact }));
       }
       case 'deactivateUser': {
-        const auth = requireRole(body.actorId, ['admin']);
+        const auth = requireRole(p.actorId, ['admin']);
         if (!auth.success) return jsonResponse(auth);
-        return jsonResponse(deactivateUser(body.id));
+        return jsonResponse(deactivateUser(p.id));
       }
       case 'createVehicle': {
-        const auth = requireRole(body.actorId, ['admin', 'fleetmanager']);
+        const auth = requireRole(p.actorId, ['admin', 'fleetmanager']);
         if (!auth.success) return jsonResponse(auth);
-        return jsonResponse(createVehicle(body.name, body.registration, body.capacity, body.type));
+        return jsonResponse(createVehicle(p.name, p.registration, p.capacity, p.type));
       }
       case 'updateVehicle': {
-        const auth = requireRole(body.actorId, ['admin', 'fleetmanager']);
+        const auth = requireRole(p.actorId, ['admin', 'fleetmanager']);
         if (!auth.success) return jsonResponse(auth);
-        return jsonResponse(updateVehicle(body.id, { name: body.name, registration: body.registration, capacity: body.capacity, type: body.type }));
+        return jsonResponse(updateVehicle(p.id, { name: p.name, registration: p.registration, capacity: p.capacity, type: p.type }));
       }
       case 'deactivateVehicle': {
-        const auth = requireRole(body.actorId, ['admin', 'fleetmanager']);
+        const auth = requireRole(p.actorId, ['admin', 'fleetmanager']);
         if (!auth.success) return jsonResponse(auth);
-        return jsonResponse(deactivateVehicle(body.id));
+        return jsonResponse(deactivateVehicle(p.id));
       }
       case 'createDriver': {
-        const auth = requireRole(body.actorId, ['admin', 'fleetmanager']);
+        const auth = requireRole(p.actorId, ['admin', 'fleetmanager']);
         if (!auth.success) return jsonResponse(auth);
-        return jsonResponse(createDriver(body.name, body.contact));
+        return jsonResponse(createDriver(p.name, p.contact));
       }
       case 'updateDriver': {
-        const auth = requireRole(body.actorId, ['admin', 'fleetmanager']);
+        const auth = requireRole(p.actorId, ['admin', 'fleetmanager']);
         if (!auth.success) return jsonResponse(auth);
-        return jsonResponse(updateDriver(body.id, { name: body.name, contact: body.contact }));
+        return jsonResponse(updateDriver(p.id, { name: p.name, contact: p.contact }));
       }
       case 'deactivateDriver': {
-        const auth = requireRole(body.actorId, ['admin', 'fleetmanager']);
+        const auth = requireRole(p.actorId, ['admin', 'fleetmanager']);
         if (!auth.success) return jsonResponse(auth);
-        return jsonResponse(deactivateDriver(body.id));
+        return jsonResponse(deactivateDriver(p.id));
       }
       case 'createBooking':
-        return jsonResponse(createBooking(body.employeeId, body.employeeName, body.date, body.fromTime, body.toTime, body.purpose, body.people));
+        return jsonResponse(createBooking(p.employeeId, p.employeeName, p.date, p.fromTime, p.toTime, p.purpose, p.people));
       case 'approveBooking': {
-        const auth = requireRole(body.actorId, ['fleetmanager', 'admin']);
+        const auth = requireRole(p.actorId, ['fleetmanager', 'admin']);
         if (!auth.success) return jsonResponse(auth);
-        return jsonResponse(approveBooking(body.bookingId, body.vehicleId, body.driverId, auth.user.name));
+        return jsonResponse(approveBooking(p.bookingId, p.vehicleId, p.driverId, auth.user.name));
       }
       case 'rejectBooking': {
-        const auth = requireRole(body.actorId, ['fleetmanager', 'admin']);
+        const auth = requireRole(p.actorId, ['fleetmanager', 'admin']);
         if (!auth.success) return jsonResponse(auth);
-        return jsonResponse(rejectBooking(body.bookingId, body.reason, auth.user.name));
+        return jsonResponse(rejectBooking(p.bookingId, p.reason, auth.user.name));
       }
       case 'cancelBooking':
-        return jsonResponse(cancelBooking(body.bookingId, body.employeeId));
+        return jsonResponse(cancelBooking(p.bookingId, p.employeeId));
       default:
         return jsonResponse({ success: false, error: 'Unknown action: ' + action });
     }
