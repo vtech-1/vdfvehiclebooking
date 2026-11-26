@@ -61,8 +61,21 @@ function _isDuplicateBooking(employeeId, date, fromTime, toTime) {
   return false;
 }
 
+// date is "yyyy-MM-dd", fromTime/toTime are "HH:mm" (from <input type="date">
+// and <input type="time">, which always use these formats regardless of locale).
+function _isPastDate(date) {
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  return date < today;
+}
+
 function createBooking(employeeId, employeeName, date, fromTime, toTime, purpose, people) {
   try {
+    if (_isPastDate(date)) {
+      return { success: false, error: 'Booking date cannot be in the past' };
+    }
+    if (toTime <= fromTime) {
+      return { success: false, error: 'End time must be after start time' };
+    }
     if (_isDuplicateBooking(employeeId, date, fromTime, toTime)) {
       return { success: false, error: 'You already have a booking request for this date and time' };
     }
@@ -127,10 +140,37 @@ function getMyBookings(employeeId) {
   return bookings;
 }
 
+// Two time ranges on the same date overlap unless one ends at or before the other starts.
+function _timeRangesOverlap(aFrom, aTo, bFrom, bTo) {
+  return aFrom < bTo && bFrom < aTo;
+}
+
+// Checks already-Approved bookings for the same vehicle or driver on the same
+// date with an overlapping time range. Excludes the booking being approved itself,
+// so re-approving/editing one doesn't flag against its own prior row.
+function _findApprovalConflict(bookingId, date, fromTime, toTime, vehicleId, driverId) {
+  const data = bookingsSheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (String(row[0]) === String(bookingId)) continue;
+    if (row[8] !== 'Approved') continue;
+    if (String(row[3]) !== String(date)) continue;
+    const existingFrom = _formatTimeValue(row[4]);
+    const existingTo = _formatTimeValue(row[5]);
+    if (!_timeRangesOverlap(fromTime, toTime, existingFrom, existingTo)) continue;
+    if (String(row[9]) === String(vehicleId)) return 'Vehicle ' + vehicleId + ' is already booked for an overlapping time';
+    if (String(row[10]) === String(driverId)) return 'Driver ' + driverId + ' is already booked for an overlapping time';
+  }
+  return null;
+}
+
 function approveBooking(bookingId, vehicleId, driverId, approvedBy) {
   try {
     const booking = getBookingById(bookingId);
     if (!booking) return { success: false, error: 'Booking not found' };
+
+    const conflict = _findApprovalConflict(bookingId, booking.date, booking.fromTime, booking.toTime, vehicleId, driverId);
+    if (conflict) return { success: false, error: conflict };
 
     const approvedDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
 

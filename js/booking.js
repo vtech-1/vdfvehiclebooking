@@ -56,6 +56,14 @@ async function submitNewBooking() {
     showToast('Please fill all fields', 'error');
     return;
   }
+  if (date < todayISO()) {
+    showToast('Booking date cannot be in the past', 'error');
+    return;
+  }
+  if (toTime <= fromTime) {
+    showToast('End time must be after start time', 'error');
+    return;
+  }
 
   const submitBtn = document.getElementById('bookingSubmitBtn');
   STATE.submittingBooking = true;
