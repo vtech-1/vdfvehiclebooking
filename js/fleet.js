@@ -74,14 +74,23 @@ function renderApprovedBookings() {
   `;
 }
 
+// page-admin-home already loads vehicles/drivers into STATE on every visit
+// (loadAdminVehicles/loadAdminDrivers), so reuse that instead of re-fetching
+// the same data again on every single "Approve" click. Only hits the network
+// if STATE is empty, e.g. a direct deep link before the page finished loading.
 async function openApprovalModal(bookingId) {
   STATE.activeApprovalBookingId = bookingId;
-  const [vehiclesRes, driversRes] = await Promise.all([
-    apiGet('getVehicles', {}),
-    apiGet('getDrivers', {})
-  ]);
-  const vehicles = (vehiclesRes.success && vehiclesRes.vehicles) || [];
-  const drivers = (driversRes.success && driversRes.drivers) || [];
+
+  let vehicles = STATE.vehicles;
+  let drivers = STATE.drivers;
+  if (!vehicles.length || !drivers.length) {
+    const [vehiclesRes, driversRes] = await Promise.all([
+      apiGet('getVehicles', {}),
+      apiGet('getDrivers', {})
+    ]);
+    vehicles = (vehiclesRes.success && vehiclesRes.vehicles) || [];
+    drivers = (driversRes.success && driversRes.drivers) || [];
+  }
 
   const vehicleSelect = document.getElementById('approveVehicleSelect');
   vehicleSelect.innerHTML = '<option value="">Select vehicle</option>' +
@@ -114,8 +123,16 @@ async function submitApproval() {
   if (result.success) {
     showToast('Booking approved', 'success');
     closeModal('approvalModal');
-    loadPendingBookings();
-    loadApprovedBookings();
+    const idx = STATE.pendingBookings.findIndex((b) => b.id === bookingId);
+    if (idx !== -1) {
+      const [booking] = STATE.pendingBookings.splice(idx, 1);
+      booking.status = 'Approved';
+      booking.vehicleId = vehicleId;
+      booking.driverId = driverId;
+      STATE.approvedBookings.push(booking);
+    }
+    renderPendingBookings();
+    renderApprovedBookings();
   } else {
     showToast(result.error || 'Could not approve booking', 'error');
   }
@@ -145,7 +162,8 @@ async function submitRejection() {
   if (result.success) {
     showToast('Booking rejected', 'success');
     closeModal('rejectionModal');
-    loadPendingBookings();
+    STATE.pendingBookings = STATE.pendingBookings.filter((b) => b.id !== bookingId);
+    renderPendingBookings();
   } else {
     showToast(result.error || 'Could not reject booking', 'error');
   }

@@ -1,6 +1,5 @@
-async function loadAdminUsers() {
-  const result = await apiGet('getEmployees', {});
-  const users = (result.success && result.employees) || [];
+function renderAdminUsers() {
+  const users = STATE.employees || [];
   const rows = users.map((u) => `
     <tr>
       <td>${escapeHtml(u.id)}</td>
@@ -16,12 +15,16 @@ async function loadAdminUsers() {
   `).join('');
   document.getElementById('adminUsersTableBody').innerHTML = rows ||
     '<tr><td colspan="6" class="empty-state">No users found.</td></tr>';
-  STATE.employees = users;
 }
 
-async function loadAdminVehicles() {
-  const result = await apiGet('getVehicles', {});
-  const vehicles = (result.success && result.vehicles) || [];
+async function loadAdminUsers() {
+  const result = await apiGet('getEmployees', {});
+  STATE.employees = (result.success && result.employees) || [];
+  renderAdminUsers();
+}
+
+function renderAdminVehicles() {
+  const vehicles = STATE.vehicles || [];
   const rows = vehicles.map((v) => `
     <tr>
       <td>${escapeHtml(v.id)}</td>
@@ -38,12 +41,16 @@ async function loadAdminVehicles() {
   `).join('');
   document.getElementById('adminVehiclesTableBody').innerHTML = rows ||
     '<tr><td colspan="7" class="empty-state">No vehicles found.</td></tr>';
-  STATE.vehicles = vehicles;
 }
 
-async function loadAdminDrivers() {
-  const result = await apiGet('getDrivers', {});
-  const drivers = (result.success && result.drivers) || [];
+async function loadAdminVehicles() {
+  const result = await apiGet('getVehicles', {});
+  STATE.vehicles = (result.success && result.vehicles) || [];
+  renderAdminVehicles();
+}
+
+function renderAdminDrivers() {
+  const drivers = STATE.drivers || [];
   const rows = drivers.map((d) => `
     <tr>
       <td>${escapeHtml(d.id)}</td>
@@ -58,7 +65,12 @@ async function loadAdminDrivers() {
   `).join('');
   document.getElementById('adminDriversTableBody').innerHTML = rows ||
     '<tr><td colspan="5" class="empty-state">No drivers found.</td></tr>';
-  STATE.drivers = drivers;
+}
+
+async function loadAdminDrivers() {
+  const result = await apiGet('getDrivers', {});
+  STATE.drivers = (result.success && result.drivers) || [];
+  renderAdminDrivers();
 }
 
 function openUserModal(user) {
@@ -91,7 +103,13 @@ async function submitUser() {
   if (result.success) {
     showToast(isEdit ? 'User updated' : 'User created', 'success');
     closeModal('userModal');
-    loadAdminUsers();
+    if (isEdit) {
+      const existing = STATE.employees.find((u) => u.id === id);
+      if (existing) Object.assign(existing, { name, role, contact });
+      renderAdminUsers();
+    } else {
+      loadAdminUsers();
+    }
   } else {
     showToast(result.error || 'Could not save user', 'error');
   }
@@ -101,7 +119,10 @@ async function deactivateUser(id) {
   const result = await apiPost('deactivateUser', { actorId: STATE.currentUser.id, id });
   if (result.success) {
     showToast('User deactivated', 'success');
-    loadAdminUsers();
+    // getEmployees only ever returns active users, so match that here
+    // instead of leaving a stale inactive row a refetch would never show.
+    STATE.employees = STATE.employees.filter((u) => u.id !== id);
+    renderAdminUsers();
   } else {
     showToast(result.error || 'Could not deactivate user', 'error');
   }
@@ -139,7 +160,13 @@ async function submitVehicle() {
   if (result.success) {
     showToast(isEdit ? 'Vehicle updated' : 'Vehicle created', 'success');
     closeModal('vehicleModal');
-    loadAdminVehicles();
+    if (isEdit) {
+      const existing = STATE.vehicles.find((v) => v.id === id);
+      if (existing) Object.assign(existing, { name, registration, capacity, type });
+    } else {
+      STATE.vehicles.push({ id: result.id, name, registration, capacity, type, active: true });
+    }
+    renderAdminVehicles();
   } else {
     showToast(result.error || 'Could not save vehicle', 'error');
   }
@@ -149,7 +176,8 @@ async function deactivateVehicle(id) {
   const result = await apiPost('deactivateVehicle', { actorId: STATE.currentUser.id, id });
   if (result.success) {
     showToast('Vehicle deactivated', 'success');
-    loadAdminVehicles();
+    STATE.vehicles = STATE.vehicles.filter((v) => v.id !== id);
+    renderAdminVehicles();
   } else {
     showToast(result.error || 'Could not deactivate vehicle', 'error');
   }
@@ -183,7 +211,14 @@ async function submitDriver() {
   if (result.success) {
     showToast(isEdit ? 'Driver updated' : 'Driver created', 'success');
     closeModal('driverModal');
-    loadAdminDrivers();
+    if (isEdit) {
+      const existing = STATE.drivers.find((d) => d.id === id);
+      if (existing) Object.assign(existing, { name, contact });
+      renderAdminDrivers();
+    } else {
+      STATE.drivers.push({ id: result.id, name, contact, active: true });
+      renderAdminDrivers();
+    }
   } else {
     showToast(result.error || 'Could not save driver', 'error');
   }
@@ -193,7 +228,8 @@ async function deactivateDriver(id) {
   const result = await apiPost('deactivateDriver', { actorId: STATE.currentUser.id, id });
   if (result.success) {
     showToast('Driver deactivated', 'success');
-    loadAdminDrivers();
+    STATE.drivers = STATE.drivers.filter((d) => d.id !== id);
+    renderAdminDrivers();
   } else {
     showToast(result.error || 'Could not deactivate driver', 'error');
   }
