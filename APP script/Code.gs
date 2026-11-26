@@ -38,6 +38,18 @@ function doGet(e) {
         return jsonResponse({ success: true, user: getUserById(p.id) });
       case 'getEmployees':
         return jsonResponse({ success: true, employees: getEmployees() });
+      // Single round trip for everything the admin/fleetmanager dashboard needs
+      // on load, instead of 5 separate HTTP requests (each with its own Apps
+      // Script dispatch overhead) for employees/vehicles/drivers/pending/approved.
+      case 'getAdminDashboardData':
+        return jsonResponse({
+          success: true,
+          employees: getEmployees(),
+          vehicles: getVehicles(),
+          drivers: getDrivers(),
+          pendingBookings: getPendingBookings(),
+          approvedBookings: getApprovedBookings()
+        });
       case 'getVehicles':
         return jsonResponse({ success: true, vehicles: getVehicles() });
       case 'getVehicleById':

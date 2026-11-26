@@ -188,11 +188,6 @@ function bindEvents() {
 function onPageShown(pageId) {
   if (pageId === 'page-employee-home') loadMyBookings();
   if (pageId === 'page-admin-home') {
-    loadAdminUsers();
-    loadAdminVehicles();
-    loadAdminDrivers();
-    loadPendingBookings();
-    loadApprovedBookings();
-    if (typeof renderUtilization === 'function') renderUtilization();
+    loadAdminDashboardData();
   }
 }

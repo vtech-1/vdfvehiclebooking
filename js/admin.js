@@ -1,3 +1,28 @@
+// Single round trip for everything page-admin-home needs on load, instead of
+// 5 separate apiGet calls (employees/vehicles/drivers/pending/approved), each
+// a full HTTP round trip to Apps Script with its own dispatch overhead.
+async function loadAdminDashboardData() {
+  const result = await apiGet('getAdminDashboardData', {});
+  if (!result.success) {
+    showToast(result.error || 'Could not load dashboard data', 'error');
+    return;
+  }
+  STATE.employees = result.employees || [];
+  STATE.vehicles = result.vehicles || [];
+  STATE.drivers = result.drivers || [];
+  STATE.pendingBookings = result.pendingBookings || [];
+  STATE.approvedBookings = result.approvedBookings || [];
+
+  renderAdminUsers();
+  renderAdminVehicles();
+  renderAdminDrivers();
+  renderPendingBookings();
+  renderApprovedBookings();
+  if (typeof updatePendingCountBadge === 'function') updatePendingCountBadge();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  if (typeof renderUtilization === 'function') renderUtilization();
+}
+
 function renderAdminUsers() {
   const term = (STATE.userSearchTerm || '').toLowerCase();
   const users = (STATE.employees || []).filter((u) => !term ||
