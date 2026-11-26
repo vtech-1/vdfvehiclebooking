@@ -7,8 +7,8 @@ function _bookingRowToObject(row, rowIndex) {
     employeeName: row[1],
     employeeId: row[2],
     date: row[3],
-    fromTime: row[4],
-    toTime: row[5],
+    fromTime: _formatTimeValue(row[4]),
+    toTime: _formatTimeValue(row[5]),
     purpose: row[6],
     people: row[7],
     status: row[8],
@@ -21,6 +21,17 @@ function _bookingRowToObject(row, rowIndex) {
   };
 }
 
+// Sheets auto-formats a time-like string written via appendRow into a Date cell,
+// so getValues() hands back a Date object (serialized as a long ISO string over
+// JSON) instead of the "HH:mm" string that was written. Normalize both shapes
+// back to "HH:mm" here so the frontend never has to guess which it got.
+function _formatTimeValue(value) {
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'HH:mm');
+  }
+  return value;
+}
+
 function generateBookingId() {
   const data = bookingsSheet.getDataRange().getValues();
   let max = 0;
@@ -31,8 +42,31 @@ function generateBookingId() {
   return 'BK' + String(max + 1).padStart(4, '0');
 }
 
+// Guards against the same employee submitting the same slot twice (e.g. a
+// double-tap on Submit before the button disables, or a retried request after
+// a slow response). Only Pending/Approved bookings block a duplicate; a
+// Rejected or Cancelled one for the same slot does not.
+function _isDuplicateBooking(employeeId, date, fromTime, toTime) {
+  const data = bookingsSheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const status = row[8];
+    if (status !== 'Pending' && status !== 'Approved') continue;
+    if (String(row[2]) !== String(employeeId)) continue;
+    if (String(row[3]) !== String(date)) continue;
+    if (_formatTimeValue(row[4]) !== fromTime) continue;
+    if (_formatTimeValue(row[5]) !== toTime) continue;
+    return true;
+  }
+  return false;
+}
+
 function createBooking(employeeId, employeeName, date, fromTime, toTime, purpose, people) {
   try {
+    if (_isDuplicateBooking(employeeId, date, fromTime, toTime)) {
+      return { success: false, error: 'You already have a booking request for this date and time' };
+    }
+
     const bookingId = generateBookingId();
     const requestedDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
 

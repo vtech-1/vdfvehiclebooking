@@ -43,6 +43,8 @@ function openNewBookingModal() {
 }
 
 async function submitNewBooking() {
+  if (STATE.submittingBooking) return;
+
   const user = STATE.currentUser;
   const date = document.getElementById('bookingDate').value;
   const fromTime = document.getElementById('bookingFromTime').value;
@@ -55,22 +57,31 @@ async function submitNewBooking() {
     return;
   }
 
-  const result = await apiPost('createBooking', {
-    employeeId: user.id,
-    employeeName: user.name,
-    date,
-    fromTime,
-    toTime,
-    purpose,
-    people
-  });
+  const submitBtn = document.getElementById('bookingSubmitBtn');
+  STATE.submittingBooking = true;
+  if (submitBtn) submitBtn.disabled = true;
 
-  if (result.success) {
-    showToast('Booking request submitted', 'success');
-    closeModal('newBookingModal');
-    loadMyBookings();
-  } else {
-    showToast(result.error || 'Could not submit booking', 'error');
+  try {
+    const result = await apiPost('createBooking', {
+      employeeId: user.id,
+      employeeName: user.name,
+      date,
+      fromTime,
+      toTime,
+      purpose,
+      people
+    });
+
+    if (result.success) {
+      showToast('Booking request submitted', 'success');
+      closeModal('newBookingModal');
+      loadMyBookings();
+    } else {
+      showToast(result.error || 'Could not submit booking', 'error');
+    }
+  } finally {
+    STATE.submittingBooking = false;
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
