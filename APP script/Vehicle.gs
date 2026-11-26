@@ -1,5 +1,3 @@
-let _vehiclesCache = null;
-
 function _vehicleRowToObject(row, rowIndex) {
   return {
     rowIndex: rowIndex,
@@ -13,14 +11,12 @@ function _vehicleRowToObject(row, rowIndex) {
 }
 
 function getVehicles() {
-  if (_vehiclesCache) return _vehiclesCache;
   const data = vehiclesSheet.getDataRange().getValues();
   const vehicles = [];
   for (let i = 1; i < data.length; i++) {
     const vehicle = _vehicleRowToObject(data[i], i + 1);
     if (vehicle.active) vehicles.push(vehicle);
   }
-  _vehiclesCache = vehicles;
   return vehicles;
 }
 
@@ -47,7 +43,6 @@ function _generateVehicleId() {
 function createVehicle(name, registration, capacity, type) {
   const id = _generateVehicleId();
   vehiclesSheet.appendRow([id, name, registration, capacity, type, true]);
-  _vehiclesCache = null;
   return { success: true, id: id };
 }
 
@@ -60,7 +55,6 @@ function updateVehicle(id, fields) {
       vehiclesSheet.getRange(vehicle.rowIndex, colMap[key]).setValue(fields[key]);
     }
   });
-  _vehiclesCache = null;
   return { success: true };
 }
 
@@ -68,6 +62,5 @@ function deactivateVehicle(id) {
   const vehicle = getVehicleById(id);
   if (!vehicle) return { success: false, error: 'Vehicle not found' };
   vehiclesSheet.getRange(vehicle.rowIndex, 6).setValue(false);
-  _vehiclesCache = null;
   return { success: true };
 }

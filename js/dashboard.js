@@ -24,17 +24,12 @@ function renderTodaysTrips(todaysTrips) {
     return;
   }
 
-  const vehicleNameById = {};
-  (STATE.vehicles || []).forEach((v) => { vehicleNameById[v.id] = v.name; });
-  const driverNameById = {};
-  (STATE.drivers || []).forEach((d) => { driverNameById[d.id] = d.name; });
-
-  const rows = todaysTrips.map((b) => `
+  const rows = [...todaysTrips].sort(compareByDateTime).map((b) => `
     <tr>
       <td>${escapeHtml(b.employeeName)}</td>
       <td>${formatTime(b.fromTime)} - ${formatTime(b.toTime)}</td>
-      <td>${escapeHtml(vehicleNameById[b.vehicleId] || b.vehicleId || '-')}</td>
-      <td>${escapeHtml(driverNameById[b.driverId] || b.driverId || '-')}</td>
+      <td>${escapeHtml(vehicleNameFor(b.vehicleId))}</td>
+      <td>${escapeHtml(driverNameFor(b.driverId))}</td>
     </tr>
   `).join('');
 

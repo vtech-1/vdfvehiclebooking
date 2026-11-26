@@ -2,6 +2,18 @@
 // 5 separate apiGet calls (employees/vehicles/drivers/pending/approved), each
 // a full HTTP round trip to Apps Script with its own dispatch overhead.
 async function loadAdminDashboardData() {
+  const loadingRow = (cols) => `<tr><td colspan="${cols}" class="empty-state">Loading…</td></tr>`;
+  const loadingDiv = '<div class="empty-state">Loading…</div>';
+  [['adminUsersTableBody', 6], ['adminVehiclesTableBody', 7], ['adminDriversTableBody', 5],
+    ['vehicleUtilizationTableBody', 3], ['driverUtilizationTableBody', 3]].forEach(([elId, cols]) => {
+    const el = document.getElementById(elId);
+    if (el) el.innerHTML = loadingRow(cols);
+  });
+  ['pendingBookingsList', 'approvedBookingsList', 'todaysTripsList'].forEach((elId) => {
+    const el = document.getElementById(elId);
+    if (el) el.innerHTML = loadingDiv;
+  });
+
   const result = await apiGet('getAdminDashboardData', {});
   if (!result.success) {
     showToast(result.error || 'Could not load dashboard data', 'error');
@@ -132,36 +144,43 @@ async function submitUser() {
   }
 
   const isEdit = !!STATE.adminEditTarget;
-  const result = await apiPost(isEdit ? 'updateUser' : 'createUser', {
-    actorId: STATE.currentUser.id, id, name, role, contact
-  });
+  await runGuarded('saveUser', 'userSubmitBtn', async () => {
+    const result = await apiPost(isEdit ? 'updateUser' : 'createUser', {
+      actorId: STATE.currentUser.id, id, name, role, contact
+    });
 
-  if (result.success) {
-    showToast(isEdit ? 'User updated' : 'User created', 'success');
-    closeModal('userModal');
-    if (isEdit) {
-      const existing = STATE.employees.find((u) => u.id === id);
-      if (existing) Object.assign(existing, { name, role, contact });
-      renderAdminUsers();
+    if (result.success) {
+      showToast(isEdit ? 'User updated' : 'User created. Temporary password = Employee ID', 'success');
+      closeModal('userModal');
+      if (isEdit) {
+        const existing = STATE.employees.find((u) => sameId(u.id, id));
+        if (existing) Object.assign(existing, { name, role, contact });
+        renderAdminUsers();
+      } else {
+        loadAdminUsers();
+      }
     } else {
-      loadAdminUsers();
+      showToast(result.error || 'Could not save user', 'error');
     }
-  } else {
-    showToast(result.error || 'Could not save user', 'error');
-  }
+  });
 }
 
 async function deactivateUser(id) {
-  const result = await apiPost('deactivateUser', { actorId: STATE.currentUser.id, id });
-  if (result.success) {
-    showToast('User deactivated', 'success');
-    // getEmployees only ever returns active users, so match that here
-    // instead of leaving a stale inactive row a refetch would never show.
-    STATE.employees = STATE.employees.filter((u) => u.id !== id);
-    renderAdminUsers();
-  } else {
-    showToast(result.error || 'Could not deactivate user', 'error');
-  }
+  const user = STATE.employees.find((u) => sameId(u.id, id));
+  if (!confirm(`Deactivate ${user ? user.name : id}? This cannot be undone from the app.`)) return;
+  await runGuarded('deactivateUser:' + id, null, async () => {
+    const result = await apiPost('deactivateUser', { actorId: STATE.currentUser.id, id });
+    if (result.success) {
+      showToast('User deactivated', 'success');
+      // getEmployees only ever returns active users, so match that here
+      // instead of leaving a stale inactive row a refetch would never show.
+      STATE.employees = STATE.employees.filter((u) => !sameId(u.id, id));
+      renderAdminUsers();
+      if (typeof renderDashboard === 'function') renderDashboard();
+    } else {
+      showToast(result.error || 'Could not deactivate user', 'error');
+    }
+  });
 }
 
 function openVehicleModal(vehicle) {
@@ -189,34 +208,44 @@ async function submitVehicle() {
   }
 
   const isEdit = !!STATE.adminEditTarget;
-  const result = await apiPost(isEdit ? 'updateVehicle' : 'createVehicle', {
-    actorId: STATE.currentUser.id, id, name, registration, capacity, type
-  });
+  await runGuarded('saveVehicle', 'vehicleSubmitBtn', async () => {
+    const result = await apiPost(isEdit ? 'updateVehicle' : 'createVehicle', {
+      actorId: STATE.currentUser.id, id, name, registration, capacity, type
+    });
 
-  if (result.success) {
-    showToast(isEdit ? 'Vehicle updated' : 'Vehicle created', 'success');
-    closeModal('vehicleModal');
-    if (isEdit) {
-      const existing = STATE.vehicles.find((v) => v.id === id);
-      if (existing) Object.assign(existing, { name, registration, capacity, type });
+    if (result.success) {
+      showToast(isEdit ? 'Vehicle updated' : 'Vehicle created', 'success');
+      closeModal('vehicleModal');
+      if (isEdit) {
+        const existing = STATE.vehicles.find((v) => sameId(v.id, id));
+        if (existing) Object.assign(existing, { name, registration, capacity, type });
+      } else {
+        STATE.vehicles.push({ id: result.id, name, registration, capacity, type, active: true });
+      }
+      renderAdminVehicles();
+      if (typeof renderDashboard === 'function') renderDashboard();
+      if (typeof renderUtilization === 'function') renderUtilization();
     } else {
-      STATE.vehicles.push({ id: result.id, name, registration, capacity, type, active: true });
+      showToast(result.error || 'Could not save vehicle', 'error');
     }
-    renderAdminVehicles();
-  } else {
-    showToast(result.error || 'Could not save vehicle', 'error');
-  }
+  });
 }
 
 async function deactivateVehicle(id) {
-  const result = await apiPost('deactivateVehicle', { actorId: STATE.currentUser.id, id });
-  if (result.success) {
-    showToast('Vehicle deactivated', 'success');
-    STATE.vehicles = STATE.vehicles.filter((v) => v.id !== id);
-    renderAdminVehicles();
-  } else {
-    showToast(result.error || 'Could not deactivate vehicle', 'error');
-  }
+  const vehicle = STATE.vehicles.find((v) => sameId(v.id, id));
+  if (!confirm(`Deactivate ${vehicle ? vehicle.name : id}? This cannot be undone from the app.`)) return;
+  await runGuarded('deactivateVehicle:' + id, null, async () => {
+    const result = await apiPost('deactivateVehicle', { actorId: STATE.currentUser.id, id });
+    if (result.success) {
+      showToast('Vehicle deactivated', 'success');
+      STATE.vehicles = STATE.vehicles.filter((v) => !sameId(v.id, id));
+      renderAdminVehicles();
+      if (typeof renderDashboard === 'function') renderDashboard();
+      if (typeof renderUtilization === 'function') renderUtilization();
+    } else {
+      showToast(result.error || 'Could not deactivate vehicle', 'error');
+    }
+  });
 }
 
 function openDriverModal(driver) {
@@ -240,33 +269,42 @@ async function submitDriver() {
   }
 
   const isEdit = !!STATE.adminEditTarget;
-  const result = await apiPost(isEdit ? 'updateDriver' : 'createDriver', {
-    actorId: STATE.currentUser.id, id, name, contact
-  });
+  await runGuarded('saveDriver', 'driverSubmitBtn', async () => {
+    const result = await apiPost(isEdit ? 'updateDriver' : 'createDriver', {
+      actorId: STATE.currentUser.id, id, name, contact
+    });
 
-  if (result.success) {
-    showToast(isEdit ? 'Driver updated' : 'Driver created', 'success');
-    closeModal('driverModal');
-    if (isEdit) {
-      const existing = STATE.drivers.find((d) => d.id === id);
-      if (existing) Object.assign(existing, { name, contact });
+    if (result.success) {
+      showToast(isEdit ? 'Driver updated' : 'Driver created', 'success');
+      closeModal('driverModal');
+      if (isEdit) {
+        const existing = STATE.drivers.find((d) => sameId(d.id, id));
+        if (existing) Object.assign(existing, { name, contact });
+      } else {
+        STATE.drivers.push({ id: result.id, name, contact, active: true });
+      }
       renderAdminDrivers();
+      if (typeof renderDashboard === 'function') renderDashboard();
+      if (typeof renderUtilization === 'function') renderUtilization();
     } else {
-      STATE.drivers.push({ id: result.id, name, contact, active: true });
-      renderAdminDrivers();
+      showToast(result.error || 'Could not save driver', 'error');
     }
-  } else {
-    showToast(result.error || 'Could not save driver', 'error');
-  }
+  });
 }
 
 async function deactivateDriver(id) {
-  const result = await apiPost('deactivateDriver', { actorId: STATE.currentUser.id, id });
-  if (result.success) {
-    showToast('Driver deactivated', 'success');
-    STATE.drivers = STATE.drivers.filter((d) => d.id !== id);
-    renderAdminDrivers();
-  } else {
-    showToast(result.error || 'Could not deactivate driver', 'error');
-  }
+  const driver = STATE.drivers.find((d) => sameId(d.id, id));
+  if (!confirm(`Deactivate ${driver ? driver.name : id}? This cannot be undone from the app.`)) return;
+  await runGuarded('deactivateDriver:' + id, null, async () => {
+    const result = await apiPost('deactivateDriver', { actorId: STATE.currentUser.id, id });
+    if (result.success) {
+      showToast('Driver deactivated', 'success');
+      STATE.drivers = STATE.drivers.filter((d) => !sameId(d.id, id));
+      renderAdminDrivers();
+      if (typeof renderDashboard === 'function') renderDashboard();
+      if (typeof renderUtilization === 'function') renderUtilization();
+    } else {
+      showToast(result.error || 'Could not deactivate driver', 'error');
+    }
+  });
 }

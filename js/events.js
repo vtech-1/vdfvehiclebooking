@@ -104,7 +104,7 @@ function bindEvents() {
     adminUsersTableBody.addEventListener('click', (e) => {
       const editBtn = e.target.closest('[data-edit-user]');
       if (editBtn) {
-        const user = STATE.employees.find((u) => u.id === editBtn.dataset.editUser);
+        const user = STATE.employees.find((u) => sameId(u.id, editBtn.dataset.editUser));
         openUserModal(user);
       }
       const deactivateBtn = e.target.closest('[data-deactivate-user]');
@@ -136,7 +136,7 @@ function bindEvents() {
     adminVehiclesTableBody.addEventListener('click', (e) => {
       const editBtn = e.target.closest('[data-edit-vehicle]');
       if (editBtn) {
-        const vehicle = STATE.vehicles.find((v) => v.id === editBtn.dataset.editVehicle);
+        const vehicle = STATE.vehicles.find((v) => sameId(v.id, editBtn.dataset.editVehicle));
         openVehicleModal(vehicle);
       }
       const deactivateBtn = e.target.closest('[data-deactivate-vehicle]');
@@ -168,7 +168,7 @@ function bindEvents() {
     adminDriversTableBody.addEventListener('click', (e) => {
       const editBtn = e.target.closest('[data-edit-driver]');
       if (editBtn) {
-        const driver = STATE.drivers.find((d) => d.id === editBtn.dataset.editDriver);
+        const driver = STATE.drivers.find((d) => sameId(d.id, editBtn.dataset.editDriver));
         openDriverModal(driver);
       }
       const deactivateBtn = e.target.closest('[data-deactivate-driver]');
@@ -186,7 +186,11 @@ function bindEvents() {
 }
 
 function onPageShown(pageId) {
-  if (pageId === 'page-employee-home') loadMyBookings();
+  if (pageId === 'page-employee-home') {
+    const nameEl = document.getElementById('employeeHeaderName');
+    if (nameEl) nameEl.textContent = (STATE.currentUser && STATE.currentUser.name) || '';
+    loadMyBookings();
+  }
   if (pageId === 'page-admin-home') {
     loadAdminDashboardData();
   }

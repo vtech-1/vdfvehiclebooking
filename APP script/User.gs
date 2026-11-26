@@ -1,5 +1,3 @@
-let _employeesCache = null;
-
 function _hashPassword(plain) {
   const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, plain, Utilities.Charset.UTF_8);
   return digest.map(function (b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
@@ -30,14 +28,12 @@ function getUserById(id) {
 }
 
 function getEmployees() {
-  if (_employeesCache) return _employeesCache;
   const data = usersSheet.getDataRange().getValues();
   const employees = [];
   for (let i = 1; i < data.length; i++) {
     const user = _userRowToObject(data[i], i + 1);
     if (user.active) employees.push(user);
   }
-  _employeesCache = employees;
   return employees;
 }
 
@@ -71,14 +67,12 @@ function changePassword(id, oldPassword, newPassword) {
   }
   usersSheet.getRange(user.rowIndex, 3).setValue(_hashPassword(newPassword));
   usersSheet.getRange(user.rowIndex, 5).setValue(false);
-  _employeesCache = null;
   return { success: true };
 }
 
 function createUser(id, name, role, contact, telegramId) {
   if (getUserById(id)) return { success: false, error: 'User ID already exists' };
   usersSheet.appendRow([id, name, _hashPassword(String(id)), role, true, contact || '', telegramId || '', true]);
-  _employeesCache = null;
   return { success: true, id: id };
 }
 
@@ -91,7 +85,6 @@ function updateUser(id, fields) {
       usersSheet.getRange(user.rowIndex, colMap[key]).setValue(fields[key]);
     }
   });
-  _employeesCache = null;
   return { success: true };
 }
 
@@ -99,6 +92,5 @@ function deactivateUser(id) {
   const user = getUserById(id);
   if (!user) return { success: false, error: 'User not found' };
   usersSheet.getRange(user.rowIndex, 8).setValue(false);
-  _employeesCache = null;
   return { success: true };
 }

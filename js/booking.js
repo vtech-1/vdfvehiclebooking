@@ -1,5 +1,7 @@
 async function loadMyBookings() {
   const user = STATE.currentUser;
+  const list = document.getElementById('myBookingsList');
+  if (list) list.innerHTML = '<div class="empty-state">Loading…</div>';
   const result = await apiGet('getMyBookings', { employeeId: user.id });
   if (!result.success) {
     showToast(result.error || 'Could not load bookings', 'error');
@@ -16,7 +18,10 @@ function renderMyBookings() {
     list.innerHTML = '<div class="empty-state">No bookings yet. Tap + to request a vehicle.</div>';
     return;
   }
-  list.innerHTML = STATE.myBookings.map(renderMyBookingCard).join('');
+  const today = todayISO();
+  const upcoming = STATE.myBookings.filter((b) => b.date >= today).sort(compareByDateTime);
+  const past = STATE.myBookings.filter((b) => b.date < today).sort(compareByDateTime).reverse();
+  list.innerHTML = [...upcoming, ...past].map(renderMyBookingCard).join('');
 }
 
 function renderMyBookingCard(b) {
@@ -29,7 +34,7 @@ function renderMyBookingCard(b) {
       </div>
       <div class="ticket-card-meta">Date: ${formatDate(b.date)} &middot; ${formatTime(b.fromTime)} - ${formatTime(b.toTime)}</div>
       <div class="ticket-card-meta">People: ${escapeHtml(b.people)}</div>
-      ${b.status === 'Approved' ? `<div class="ticket-card-meta">Vehicle: ${escapeHtml(b.vehicleId || '-')} &middot; Driver: ${escapeHtml(b.driverId || '-')}</div>` : ''}
+      ${b.status === 'Approved' ? `<div class="ticket-card-meta">Vehicle: ${escapeHtml(b.vehicleName || b.vehicleId || '-')} &middot; Driver: ${escapeHtml(b.driverName || b.driverId || '-')}</div>` : ''}
       ${b.status === 'Rejected' && b.rejectReason ? `<div class="ticket-card-meta">Reason: ${escapeHtml(b.rejectReason)}</div>` : ''}
       ${canCancel ? `<div class="ticket-card-actions"><button class="btn btn-danger btn-small" data-cancel-booking="${escapeHtml(b.id)}">Cancel</button></div>` : ''}
     </div>
@@ -101,12 +106,14 @@ function confirmCancelBooking(bookingId) {
 async function submitCancelBooking() {
   const user = STATE.currentUser;
   const bookingId = STATE.activeCancelBookingId;
-  const result = await apiPost('cancelBooking', { bookingId, employeeId: user.id });
-  if (result.success) {
-    showToast('Booking cancelled', 'success');
-    closeModal('cancelBookingModal');
-    loadMyBookings();
-  } else {
-    showToast(result.error || 'Could not cancel booking', 'error');
-  }
+  await runGuarded('cancelBooking', 'cancelBookingConfirmBtn', async () => {
+    const result = await apiPost('cancelBooking', { bookingId, employeeId: user.id });
+    if (result.success) {
+      showToast('Booking cancelled', 'success');
+      closeModal('cancelBookingModal');
+      loadMyBookings();
+    } else {
+      showToast(result.error || 'Could not cancel booking', 'error');
+    }
+  });
 }

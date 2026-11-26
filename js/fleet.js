@@ -25,7 +25,7 @@ function renderPendingBookings() {
     list.innerHTML = '<div class="empty-state">No pending requests.</div>';
     return;
   }
-  list.innerHTML = STATE.pendingBookings.map(renderPendingCard).join('');
+  list.innerHTML = [...STATE.pendingBookings].sort(compareByDateTime).map(renderPendingCard).join('');
 }
 
 function renderPendingCard(b) {
@@ -64,14 +64,14 @@ function renderApprovedBookings() {
     list.innerHTML = '<div class="empty-state">No approved bookings.</div>';
     return;
   }
-  const rows = STATE.approvedBookings.map((b) => `
+  const rows = [...STATE.approvedBookings].sort(compareByDateTime).map((b) => `
     <tr>
       <td>${escapeHtml(b.employeeName)}</td>
       <td>${formatDate(b.date)}</td>
       <td>${formatTime(b.fromTime)} - ${formatTime(b.toTime)}</td>
       <td>${escapeHtml(b.purpose)}</td>
-      <td>${escapeHtml(b.vehicleId || '-')}</td>
-      <td>${escapeHtml(b.driverId || '-')}</td>
+      <td>${escapeHtml(vehicleNameFor(b.vehicleId))}</td>
+      <td>${escapeHtml(driverNameFor(b.driverId))}</td>
     </tr>
   `).join('');
   list.innerHTML = `
@@ -93,19 +93,13 @@ function _csvEscape(value) {
 }
 
 function downloadApprovedBookingsReport() {
-  const bookings = [...STATE.approvedBookings].sort((a, b) => {
-    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
-    return a.fromTime < b.fromTime ? -1 : a.fromTime > b.fromTime ? 1 : 0;
-  });
-
-  const vehicleNameById = {};
-  (STATE.vehicles || []).forEach((v) => { vehicleNameById[v.id] = v.name; });
+  const bookings = [...STATE.approvedBookings].sort(compareByDateTime);
 
   const header = ['Date', 'Time', 'Vehicle', 'Person', 'Reason'];
   const rows = bookings.map((b) => [
     b.date,
     `${formatTime(b.fromTime)} - ${formatTime(b.toTime)}`,
-    vehicleNameById[b.vehicleId] || b.vehicleId || '-',
+    vehicleNameFor(b.vehicleId),
     b.employeeName,
     b.purpose
   ]);
@@ -140,9 +134,23 @@ async function openApprovalModal(bookingId) {
     drivers = (driversRes.success && driversRes.drivers) || [];
   }
 
+  const booking = STATE.pendingBookings.find((b) => sameId(b.id, bookingId));
+  const people = booking ? Number(booking.people) || 0 : 0;
+
+  const info = document.getElementById('approveBookingInfo');
+  if (info) {
+    info.innerHTML = booking
+      ? `${escapeHtml(booking.employeeName)} &middot; ${formatDate(booking.date)} &middot; ${formatTime(booking.fromTime)} - ${formatTime(booking.toTime)} &middot; People: ${escapeHtml(booking.people)}`
+      : '';
+  }
+
   const vehicleSelect = document.getElementById('approveVehicleSelect');
   vehicleSelect.innerHTML = '<option value="">Select vehicle</option>' +
-    vehicles.map((v) => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.name)} (${escapeHtml(v.registration)})</option>`).join('');
+    vehicles.map((v) => {
+      const capacity = Number(v.capacity) || 0;
+      const tooSmall = people > 0 && capacity > 0 && capacity < people;
+      return `<option value="${escapeHtml(v.id)}"${tooSmall ? ' disabled' : ''}>${escapeHtml(v.name)} (${escapeHtml(v.registration)}) – Cap: ${escapeHtml(v.capacity || '-')}${tooSmall ? ' – too small' : ''}</option>`;
+    }).join('');
 
   const driverSelect = document.getElementById('approveDriverSelect');
   driverSelect.innerHTML = '<option value="">Select driver</option>' +
@@ -161,32 +169,34 @@ async function submitApproval() {
     return;
   }
 
-  const result = await apiPost('approveBooking', {
-    actorId: STATE.currentUser.id,
-    bookingId,
-    vehicleId,
-    driverId
-  });
+  await runGuarded('approveBooking', 'approvalConfirmBtn', async () => {
+    const result = await apiPost('approveBooking', {
+      actorId: STATE.currentUser.id,
+      bookingId,
+      vehicleId,
+      driverId
+    });
 
-  if (result.success) {
-    showToast('Booking approved', 'success');
-    closeModal('approvalModal');
-    const idx = STATE.pendingBookings.findIndex((b) => b.id === bookingId);
-    if (idx !== -1) {
-      const [booking] = STATE.pendingBookings.splice(idx, 1);
-      booking.status = 'Approved';
-      booking.vehicleId = vehicleId;
-      booking.driverId = driverId;
-      STATE.approvedBookings.push(booking);
+    if (result.success) {
+      showToast('Booking approved', 'success');
+      closeModal('approvalModal');
+      const idx = STATE.pendingBookings.findIndex((b) => sameId(b.id, bookingId));
+      if (idx !== -1) {
+        const [booking] = STATE.pendingBookings.splice(idx, 1);
+        booking.status = 'Approved';
+        booking.vehicleId = vehicleId;
+        booking.driverId = driverId;
+        STATE.approvedBookings.push(booking);
+      }
+      renderPendingBookings();
+      renderApprovedBookings();
+      updatePendingCountBadge();
+      if (typeof renderDashboard === 'function') renderDashboard();
+      if (typeof renderUtilization === 'function') renderUtilization();
+    } else {
+      showToast(result.error || 'Could not approve booking', 'error');
     }
-    renderPendingBookings();
-    renderApprovedBookings();
-    updatePendingCountBadge();
-    if (typeof renderDashboard === 'function') renderDashboard();
-    if (typeof renderUtilization === 'function') renderUtilization();
-  } else {
-    showToast(result.error || 'Could not approve booking', 'error');
-  }
+  });
 }
 
 function openRejectionModal(bookingId) {
@@ -204,20 +214,22 @@ async function submitRejection() {
     return;
   }
 
-  const result = await apiPost('rejectBooking', {
-    actorId: STATE.currentUser.id,
-    bookingId,
-    reason
-  });
+  await runGuarded('rejectBooking', 'rejectionConfirmBtn', async () => {
+    const result = await apiPost('rejectBooking', {
+      actorId: STATE.currentUser.id,
+      bookingId,
+      reason
+    });
 
-  if (result.success) {
-    showToast('Booking rejected', 'success');
-    closeModal('rejectionModal');
-    STATE.pendingBookings = STATE.pendingBookings.filter((b) => b.id !== bookingId);
-    renderPendingBookings();
-    updatePendingCountBadge();
-    if (typeof renderDashboard === 'function') renderDashboard();
-  } else {
-    showToast(result.error || 'Could not reject booking', 'error');
-  }
+    if (result.success) {
+      showToast('Booking rejected', 'success');
+      closeModal('rejectionModal');
+      STATE.pendingBookings = STATE.pendingBookings.filter((b) => !sameId(b.id, bookingId));
+      renderPendingBookings();
+      updatePendingCountBadge();
+      if (typeof renderDashboard === 'function') renderDashboard();
+    } else {
+      showToast(result.error || 'Could not reject booking', 'error');
+    }
+  });
 }

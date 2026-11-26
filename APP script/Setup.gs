@@ -43,6 +43,11 @@ function setupSheets() {
   const auditLog = _getOrCreateSheet(ss, 'AuditLog');
   _formatHeader(auditLog, AUDITLOG_HEADERS);
 
+  // Plain-text ID columns so ids like '0001' aren't coerced to the number 1.
+  [users, vehicles, drivers, bookings].forEach(function (sheet) {
+    sheet.getRange('A:A').setNumberFormat('@');
+  });
+
   const defaultSheet = ss.getSheetByName('Sheet1');
   if (defaultSheet) {
     ss.deleteSheet(defaultSheet);

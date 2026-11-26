@@ -28,6 +28,45 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+const _inFlightActions = new Set();
+
+// Blocks a second submit of the same action while the first request is still
+// pending (double-click / double-tap), and disables its button meanwhile.
+async function runGuarded(actionKey, buttonId, fn) {
+  if (_inFlightActions.has(actionKey)) return;
+  _inFlightActions.add(actionKey);
+  const btn = buttonId ? document.getElementById(buttonId) : null;
+  if (btn) btn.disabled = true;
+  try {
+    await fn();
+  } finally {
+    _inFlightActions.delete(actionKey);
+    if (btn) btn.disabled = false;
+  }
+}
+
+function sameId(a, b) {
+  return String(a) === String(b);
+}
+
+function vehicleNameFor(id) {
+  if (!id) return '-';
+  const v = (STATE.vehicles || []).find((x) => sameId(x.id, id));
+  return v ? v.name : id;
+}
+
+function driverNameFor(id) {
+  if (!id) return '-';
+  const d = (STATE.drivers || []).find((x) => sameId(x.id, id));
+  return d ? d.name : id;
+}
+
+function compareByDateTime(a, b) {
+  const ka = `${a.date} ${a.fromTime}`;
+  const kb = `${b.date} ${b.fromTime}`;
+  return ka < kb ? -1 : ka > kb ? 1 : 0;
+}
+
 function badgeClassForStatus(status) {
   switch (status) {
     case 'Approved': return 'badge-green';

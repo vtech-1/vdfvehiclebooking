@@ -6,7 +6,7 @@ function _bookingRowToObject(row, rowIndex) {
     id: row[0],
     employeeName: row[1],
     employeeId: row[2],
-    date: row[3],
+    date: _formatDateValue(row[3]),
     fromTime: _formatTimeValue(row[4]),
     toTime: _formatTimeValue(row[5]),
     purpose: row[6],
@@ -15,21 +15,41 @@ function _bookingRowToObject(row, rowIndex) {
     vehicleId: row[9],
     driverId: row[10],
     rejectReason: row[11],
-    requestedDate: row[12],
+    requestedDate: _formatDateTimeValue(row[12]),
     approvedBy: row[13],
-    approvedDate: row[14]
+    approvedDate: _formatDateTimeValue(row[14])
   };
 }
 
-// Sheets auto-formats a time-like string written via appendRow into a Date cell,
-// so getValues() hands back a Date object (serialized as a long ISO string over
-// JSON) instead of the "HH:mm" string that was written. Normalize both shapes
-// back to "HH:mm" here so the frontend never has to guess which it got.
+// Sheets converts date/time-like strings written via appendRow into Date cells
+// using the spreadsheet's timezone, so read them back in that same timezone.
+function _sheetTimeZone() {
+  return ss.getSpreadsheetTimeZone();
+}
+
 function _formatTimeValue(value) {
   if (value instanceof Date) {
-    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'HH:mm');
+    return Utilities.formatDate(value, _sheetTimeZone(), 'HH:mm');
   }
   return value;
+}
+
+function _formatDateValue(value) {
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, _sheetTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(value);
+}
+
+function _formatDateTimeValue(value) {
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, _sheetTimeZone(), 'yyyy-MM-dd HH:mm');
+  }
+  return value;
+}
+
+function _nowStamp() {
+  return Utilities.formatDate(new Date(), _sheetTimeZone(), 'yyyy-MM-dd HH:mm');
 }
 
 function generateBookingId() {
@@ -42,10 +62,8 @@ function generateBookingId() {
   return 'BK' + String(max + 1).padStart(4, '0');
 }
 
-// Guards against the same employee submitting the same slot twice (e.g. a
-// double-tap on Submit before the button disables, or a retried request after
-// a slow response). Only Pending/Approved bookings block a duplicate; a
-// Rejected or Cancelled one for the same slot does not.
+// Guards against the same employee submitting the same slot twice. Only
+// Pending/Approved bookings block a duplicate; Rejected/Cancelled do not.
 function _isDuplicateBooking(employeeId, date, fromTime, toTime) {
   const data = bookingsSheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
@@ -53,7 +71,7 @@ function _isDuplicateBooking(employeeId, date, fromTime, toTime) {
     const status = row[8];
     if (status !== 'Pending' && status !== 'Approved') continue;
     if (String(row[2]) !== String(employeeId)) continue;
-    if (String(row[3]) !== String(date)) continue;
+    if (_formatDateValue(row[3]) !== date) continue;
     if (_formatTimeValue(row[4]) !== fromTime) continue;
     if (_formatTimeValue(row[5]) !== toTime) continue;
     return true;
@@ -61,31 +79,43 @@ function _isDuplicateBooking(employeeId, date, fromTime, toTime) {
   return false;
 }
 
-// date is "yyyy-MM-dd", fromTime/toTime are "HH:mm" (from <input type="date">
-// and <input type="time">, which always use these formats regardless of locale).
+// date is "yyyy-MM-dd", fromTime/toTime are "HH:mm", so string comparison is safe.
 function _isPastDate(date) {
-  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const today = Utilities.formatDate(new Date(), _sheetTimeZone(), 'yyyy-MM-dd');
   return date < today;
 }
 
+function _validateBookingInput(date, fromTime, toTime, purpose, people) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date)) ||
+      !/^\d{2}:\d{2}$/.test(String(fromTime)) ||
+      !/^\d{2}:\d{2}$/.test(String(toTime))) {
+    return 'Invalid date or time';
+  }
+  if (!String(purpose || '').trim()) return 'Purpose is required';
+  const n = Number(people);
+  if (!Number.isInteger(n) || n < 1 || n > 50) return 'Number of people must be between 1 and 50';
+  if (_isPastDate(date)) return 'Booking date cannot be in the past';
+  if (toTime <= fromTime) return 'End time must be after start time';
+  return null;
+}
+
 function createBooking(employeeId, employeeName, date, fromTime, toTime, purpose, people) {
+  const validationError = _validateBookingInput(date, fromTime, toTime, purpose, people);
+  if (validationError) return { success: false, error: validationError };
+
+  // Lock so two concurrent requests can't get the same booking ID or both pass the duplicate check.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
   try {
-    if (_isPastDate(date)) {
-      return { success: false, error: 'Booking date cannot be in the past' };
-    }
-    if (toTime <= fromTime) {
-      return { success: false, error: 'End time must be after start time' };
-    }
     if (_isDuplicateBooking(employeeId, date, fromTime, toTime)) {
       return { success: false, error: 'You already have a booking request for this date and time' };
     }
 
     const bookingId = generateBookingId();
-    const requestedDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
 
     bookingsSheet.appendRow([
-      bookingId, employeeName, employeeId, date, fromTime, toTime, purpose,
-      people, 'Pending', '', '', '', requestedDate, '', ''
+      bookingId, employeeName, employeeId, date, fromTime, toTime, String(purpose).trim(),
+      Number(people), 'Pending', '', '', '', _nowStamp(), '', ''
     ]);
 
     logAudit(employeeName, 'CREATE_BOOKING', bookingId, 'New booking request for ' + date);
@@ -94,6 +124,8 @@ function createBooking(employeeId, employeeName, date, fromTime, toTime, purpose
   } catch (error) {
     logAudit('System', 'ERROR', '', error.toString());
     return { success: false, error: error.toString() };
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -129,6 +161,15 @@ function getApprovedBookings() {
   return bookings;
 }
 
+function _idToNameMap(sheet) {
+  const data = sheet.getDataRange().getValues();
+  const map = {};
+  for (let i = 1; i < data.length; i++) {
+    map[String(data[i][0])] = data[i][1];
+  }
+  return map;
+}
+
 function getMyBookings(employeeId) {
   const data = bookingsSheet.getDataRange().getValues();
   const bookings = [];
@@ -136,6 +177,14 @@ function getMyBookings(employeeId) {
     if (String(data[i][2]) === String(employeeId)) {
       bookings.push(_bookingRowToObject(data[i], i + 1));
     }
+  }
+  if (bookings.some(function (b) { return b.vehicleId || b.driverId; })) {
+    const vehicleNames = _idToNameMap(vehiclesSheet);
+    const driverNames = _idToNameMap(driversSheet);
+    bookings.forEach(function (b) {
+      b.vehicleName = vehicleNames[String(b.vehicleId)] || '';
+      b.driverName = driverNames[String(b.driverId)] || '';
+    });
   }
   return bookings;
 }
@@ -146,15 +195,14 @@ function _timeRangesOverlap(aFrom, aTo, bFrom, bTo) {
 }
 
 // Checks already-Approved bookings for the same vehicle or driver on the same
-// date with an overlapping time range. Excludes the booking being approved itself,
-// so re-approving/editing one doesn't flag against its own prior row.
+// date with an overlapping time range, excluding the booking being approved.
 function _findApprovalConflict(bookingId, date, fromTime, toTime, vehicleId, driverId) {
   const data = bookingsSheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (String(row[0]) === String(bookingId)) continue;
     if (row[8] !== 'Approved') continue;
-    if (String(row[3]) !== String(date)) continue;
+    if (_formatDateValue(row[3]) !== date) continue;
     const existingFrom = _formatTimeValue(row[4]);
     const existingTo = _formatTimeValue(row[5]);
     if (!_timeRangesOverlap(fromTime, toTime, existingFrom, existingTo)) continue;
@@ -165,20 +213,21 @@ function _findApprovalConflict(bookingId, date, fromTime, toTime, vehicleId, dri
 }
 
 function approveBooking(bookingId, vehicleId, driverId, approvedBy) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
   try {
     const booking = getBookingById(bookingId);
     if (!booking) return { success: false, error: 'Booking not found' };
+    if (booking.status !== 'Pending') return { success: false, error: 'Booking is no longer pending' };
 
     const conflict = _findApprovalConflict(bookingId, booking.date, booking.fromTime, booking.toTime, vehicleId, driverId);
     if (conflict) return { success: false, error: conflict };
-
-    const approvedDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
 
     bookingsSheet.getRange(booking.rowIndex, 9).setValue('Approved');
     bookingsSheet.getRange(booking.rowIndex, 10).setValue(vehicleId);
     bookingsSheet.getRange(booking.rowIndex, 11).setValue(driverId);
     bookingsSheet.getRange(booking.rowIndex, 14).setValue(approvedBy);
-    bookingsSheet.getRange(booking.rowIndex, 15).setValue(approvedDate);
+    bookingsSheet.getRange(booking.rowIndex, 15).setValue(_nowStamp());
 
     logAudit(approvedBy, 'APPROVE_BOOKING', bookingId, 'Assigned vehicle ' + vehicleId + ', driver ' + driverId);
 
@@ -186,6 +235,8 @@ function approveBooking(bookingId, vehicleId, driverId, approvedBy) {
   } catch (error) {
     logAudit('System', 'ERROR', bookingId, error.toString());
     return { success: false, error: error.toString() };
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -193,6 +244,7 @@ function rejectBooking(bookingId, reason, rejectedBy) {
   try {
     const booking = getBookingById(bookingId);
     if (!booking) return { success: false, error: 'Booking not found' };
+    if (booking.status !== 'Pending') return { success: false, error: 'Booking is no longer pending' };
 
     bookingsSheet.getRange(booking.rowIndex, 9).setValue('Rejected');
     bookingsSheet.getRange(booking.rowIndex, 12).setValue(reason);
@@ -210,6 +262,7 @@ function cancelBooking(bookingId, cancelledBy) {
   try {
     const booking = getBookingById(bookingId);
     if (!booking) return { success: false, error: 'Booking not found' };
+    if (booking.status !== 'Pending') return { success: false, error: 'Only pending bookings can be cancelled' };
 
     bookingsSheet.getRange(booking.rowIndex, 9).setValue('Cancelled');
 

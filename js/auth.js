@@ -1,6 +1,6 @@
 function saveSession(user) {
   const expiry = Date.now() + CONFIG.SESSION_HOURS * 60 * 60 * 1000;
-  const session = { id: user.id, name: user.name, role: user.role, expiry };
+  const session = { id: user.id, name: user.name, role: user.role, forceChange: !!user.forceChange, expiry };
   localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(session));
 }
 
@@ -26,6 +26,23 @@ function clearSession() {
 function logout() {
   clearSession();
   STATE.currentUser = null;
+  STATE.myBookings = [];
+  STATE.pendingBookings = [];
+  STATE.approvedBookings = [];
+  STATE.vehicles = [];
+  STATE.drivers = [];
+  STATE.employees = [];
+  STATE.activeApprovalBookingId = null;
+  STATE.activeRejectBookingId = null;
+  STATE.activeCancelBookingId = null;
+  STATE.adminEditTarget = null;
+  STATE.userSearchTerm = '';
+  STATE.vehicleSearchTerm = '';
+  STATE.driverSearchTerm = '';
+  ['userSearchInput', 'vehicleSearchInput', 'driverSearchInput'].forEach((inputId) => {
+    const el = document.getElementById(inputId);
+    if (el) el.value = '';
+  });
   showPage('page-login');
 }
 
@@ -52,6 +69,7 @@ async function handleChangePassword(newPassword) {
   });
   if (result.success) {
     STATE.currentUser.forceChange = false;
+    saveSession(STATE.currentUser);
     goToRolePage();
   }
   return result;
@@ -82,5 +100,9 @@ function routeOnLoad() {
     return;
   }
   STATE.currentUser = session;
+  if (session.forceChange) {
+    showPage('page-change-password');
+    return;
+  }
   goToRolePage();
 }
