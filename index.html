@@ -99,33 +99,7 @@
 </div>
 
 <!-- FLEET MANAGER HOME -->
-<div class="page" id="page-fleet-home">
-  <div class="header">
-    <div class="header-left">
-      <img src="logo.png" class="header-logo" alt="Logo" />
-      <div class="header-title">Fleet Manager</div>
-    </div>
-    <div class="header-actions">
-      <button class="btn btn-outline btn-small" data-logout>Logout</button>
-    </div>
-  </div>
-  <div class="container">
-    <div class="tab-bar">
-      <button class="admin-tab-btn active" data-admin-tab="fleetPendingPanel">Pending Requests</button>
-      <button class="admin-tab-btn" data-admin-tab="fleetApprovedPanel">Approved Bookings</button>
-    </div>
-
-    <div class="admin-tab-panel active" id="fleetPendingPanel">
-      <div id="pendingBookingsList"></div>
-    </div>
-
-    <div class="admin-tab-panel" id="fleetApprovedPanel">
-      <div id="approvedBookingsList"></div>
-    </div>
-  </div>
-</div>
-
-<!-- ADMIN HOME -->
+<!-- ADMIN HOME (shared by admin and fleetmanager roles) -->
 <div class="page" id="page-admin-home">
   <div class="header">
     <div class="header-left">
@@ -141,6 +115,16 @@
       <button class="admin-tab-btn active" data-admin-tab="adminUsersPanel">Users</button>
       <button class="admin-tab-btn" data-admin-tab="adminVehiclesPanel">Vehicles</button>
       <button class="admin-tab-btn" data-admin-tab="adminDriversPanel">Drivers</button>
+      <button class="admin-tab-btn" data-admin-tab="fleetPendingPanel">Pending Requests</button>
+      <button class="admin-tab-btn" data-admin-tab="fleetApprovedPanel">Approved Bookings</button>
+    </div>
+
+    <div class="admin-tab-panel" id="fleetPendingPanel">
+      <div id="pendingBookingsList"></div>
+    </div>
+
+    <div class="admin-tab-panel" id="fleetApprovedPanel">
+      <div id="approvedBookingsList"></div>
     </div>
 
     <div class="admin-tab-panel active" id="adminUsersPanel">

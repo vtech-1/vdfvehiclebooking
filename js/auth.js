@@ -67,8 +67,6 @@ function goToRolePage() {
       showPage('page-driver-home');
       break;
     case CONFIG.ROLES.FLEETMANAGER:
-      showPage('page-fleet-home');
-      break;
     case CONFIG.ROLES.ADMIN:
       showPage('page-admin-home');
       break;

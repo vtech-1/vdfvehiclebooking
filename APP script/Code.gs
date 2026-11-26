@@ -59,17 +59,17 @@ function doGet(e) {
       case 'changePassword':
         return jsonResponse(changePassword(p.id, p.oldPassword, p.newPassword));
       case 'createUser': {
-        const auth = requireRole(p.actorId, ['admin']);
+        const auth = requireRole(p.actorId, ['admin', 'fleetmanager']);
         if (!auth.success) return jsonResponse(auth);
         return jsonResponse(createUser(p.id, p.name, p.role, p.contact, p.telegramId));
       }
       case 'updateUser': {
-        const auth = requireRole(p.actorId, ['admin']);
+        const auth = requireRole(p.actorId, ['admin', 'fleetmanager']);
         if (!auth.success) return jsonResponse(auth);
         return jsonResponse(updateUser(p.id, { name: p.name, role: p.role, contact: p.contact }));
       }
       case 'deactivateUser': {
-        const auth = requireRole(p.actorId, ['admin']);
+        const auth = requireRole(p.actorId, ['admin', 'fleetmanager']);
         if (!auth.success) return jsonResponse(auth);
         return jsonResponse(deactivateUser(p.id));
       }
