@@ -6,6 +6,16 @@ async function loadPendingBookings() {
   }
   STATE.pendingBookings = result.bookings || [];
   renderPendingBookings();
+  updatePendingCountBadge();
+  if (typeof renderDashboard === 'function') renderDashboard();
+}
+
+function updatePendingCountBadge() {
+  const badge = document.getElementById('pendingCountBadge');
+  if (!badge) return;
+  const count = STATE.pendingBookings.length;
+  badge.textContent = count;
+  badge.style.display = count > 0 ? 'inline-flex' : 'none';
 }
 
 function renderPendingBookings() {
@@ -43,6 +53,8 @@ async function loadApprovedBookings() {
   }
   STATE.approvedBookings = result.bookings || [];
   renderApprovedBookings();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  if (typeof renderUtilization === 'function') renderUtilization();
 }
 
 function renderApprovedBookings() {
@@ -169,6 +181,9 @@ async function submitApproval() {
     }
     renderPendingBookings();
     renderApprovedBookings();
+    updatePendingCountBadge();
+    if (typeof renderDashboard === 'function') renderDashboard();
+    if (typeof renderUtilization === 'function') renderUtilization();
   } else {
     showToast(result.error || 'Could not approve booking', 'error');
   }
@@ -200,6 +215,8 @@ async function submitRejection() {
     closeModal('rejectionModal');
     STATE.pendingBookings = STATE.pendingBookings.filter((b) => b.id !== bookingId);
     renderPendingBookings();
+    updatePendingCountBadge();
+    if (typeof renderDashboard === 'function') renderDashboard();
   } else {
     showToast(result.error || 'Could not reject booking', 'error');
   }

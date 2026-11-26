@@ -112,6 +112,14 @@ function bindEvents() {
     });
   }
 
+  const userSearchInput = document.getElementById('userSearchInput');
+  if (userSearchInput) {
+    userSearchInput.addEventListener('input', (e) => {
+      STATE.userSearchTerm = e.target.value;
+      renderAdminUsers();
+    });
+  }
+
   const addVehicleBtn = document.getElementById('addVehicleBtn');
   if (addVehicleBtn) addVehicleBtn.addEventListener('click', () => openVehicleModal(null));
 
@@ -133,6 +141,14 @@ function bindEvents() {
       }
       const deactivateBtn = e.target.closest('[data-deactivate-vehicle]');
       if (deactivateBtn) deactivateVehicle(deactivateBtn.dataset.deactivateVehicle);
+    });
+  }
+
+  const vehicleSearchInput = document.getElementById('vehicleSearchInput');
+  if (vehicleSearchInput) {
+    vehicleSearchInput.addEventListener('input', (e) => {
+      STATE.vehicleSearchTerm = e.target.value;
+      renderAdminVehicles();
     });
   }
 
@@ -159,6 +175,14 @@ function bindEvents() {
       if (deactivateBtn) deactivateDriver(deactivateBtn.dataset.deactivateDriver);
     });
   }
+
+  const driverSearchInput = document.getElementById('driverSearchInput');
+  if (driverSearchInput) {
+    driverSearchInput.addEventListener('input', (e) => {
+      STATE.driverSearchTerm = e.target.value;
+      renderAdminDrivers();
+    });
+  }
 }
 
 function onPageShown(pageId) {
@@ -169,5 +193,6 @@ function onPageShown(pageId) {
     loadAdminDrivers();
     loadPendingBookings();
     loadApprovedBookings();
+    if (typeof renderUtilization === 'function') renderUtilization();
   }
 }

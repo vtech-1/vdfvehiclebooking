@@ -10,5 +10,8 @@ const STATE = {
   activeApprovalBookingId: null,
   activeRejectBookingId: null,
   activeCancelBookingId: null,
-  adminEditTarget: null
+  adminEditTarget: null,
+  userSearchTerm: '',
+  vehicleSearchTerm: '',
+  driverSearchTerm: ''
 };

@@ -1,5 +1,7 @@
 function renderAdminUsers() {
-  const users = STATE.employees || [];
+  const term = (STATE.userSearchTerm || '').toLowerCase();
+  const users = (STATE.employees || []).filter((u) => !term ||
+    [u.id, u.name, u.role, u.contact].some((f) => String(f || '').toLowerCase().includes(term)));
   const rows = users.map((u) => `
     <tr>
       <td>${escapeHtml(u.id)}</td>
@@ -21,10 +23,13 @@ async function loadAdminUsers() {
   const result = await apiGet('getEmployees', {});
   STATE.employees = (result.success && result.employees) || [];
   renderAdminUsers();
+  if (typeof renderDashboard === 'function') renderDashboard();
 }
 
 function renderAdminVehicles() {
-  const vehicles = STATE.vehicles || [];
+  const term = (STATE.vehicleSearchTerm || '').toLowerCase();
+  const vehicles = (STATE.vehicles || []).filter((v) => !term ||
+    [v.id, v.name, v.registration, v.type].some((f) => String(f || '').toLowerCase().includes(term)));
   const rows = vehicles.map((v) => `
     <tr>
       <td>${escapeHtml(v.id)}</td>
@@ -47,10 +52,14 @@ async function loadAdminVehicles() {
   const result = await apiGet('getVehicles', {});
   STATE.vehicles = (result.success && result.vehicles) || [];
   renderAdminVehicles();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  if (typeof renderUtilization === 'function') renderUtilization();
 }
 
 function renderAdminDrivers() {
-  const drivers = STATE.drivers || [];
+  const term = (STATE.driverSearchTerm || '').toLowerCase();
+  const drivers = (STATE.drivers || []).filter((d) => !term ||
+    [d.id, d.name, d.contact].some((f) => String(f || '').toLowerCase().includes(term)));
   const rows = drivers.map((d) => `
     <tr>
       <td>${escapeHtml(d.id)}</td>
@@ -71,6 +80,8 @@ async function loadAdminDrivers() {
   const result = await apiGet('getDrivers', {});
   STATE.drivers = (result.success && result.drivers) || [];
   renderAdminDrivers();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  if (typeof renderUtilization === 'function') renderUtilization();
 }
 
 function openUserModal(user) {
