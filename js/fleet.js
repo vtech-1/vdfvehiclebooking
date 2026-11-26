@@ -74,6 +74,42 @@ function renderApprovedBookings() {
   `;
 }
 
+function _csvEscape(value) {
+  const str = value === null || value === undefined ? '' : String(value);
+  if (/[",\n]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
+  return str;
+}
+
+function downloadApprovedBookingsReport() {
+  const bookings = [...STATE.approvedBookings].sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    return a.fromTime < b.fromTime ? -1 : a.fromTime > b.fromTime ? 1 : 0;
+  });
+
+  const vehicleNameById = {};
+  (STATE.vehicles || []).forEach((v) => { vehicleNameById[v.id] = v.name; });
+
+  const header = ['Date', 'Time', 'Vehicle', 'Person', 'Reason'];
+  const rows = bookings.map((b) => [
+    b.date,
+    `${formatTime(b.fromTime)} - ${formatTime(b.toTime)}`,
+    vehicleNameById[b.vehicleId] || b.vehicleId || '-',
+    b.employeeName,
+    b.purpose
+  ]);
+
+  const csv = [header, ...rows].map((r) => r.map(_csvEscape).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `approved-bookings-${todayISO()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // page-admin-home already loads vehicles/drivers into STATE on every visit
 // (loadAdminVehicles/loadAdminDrivers), so reuse that instead of re-fetching
 // the same data again on every single "Approve" click. Only hits the network

@@ -74,6 +74,9 @@ function bindEvents() {
   const approvalConfirmBtn = document.getElementById('approvalConfirmBtn');
   if (approvalConfirmBtn) approvalConfirmBtn.addEventListener('click', submitApproval);
 
+  const downloadApprovedReportBtn = document.getElementById('downloadApprovedReportBtn');
+  if (downloadApprovedReportBtn) downloadApprovedReportBtn.addEventListener('click', downloadApprovedBookingsReport);
+
   const rejectionConfirmBtn = document.getElementById('rejectionConfirmBtn');
   if (rejectionConfirmBtn) rejectionConfirmBtn.addEventListener('click', submitRejection);
 
