@@ -1,4 +1,9 @@
 function bindEvents() {
+  const fromTimeEl = document.getElementById('bookingFromTime');
+  const toTimeEl = document.getElementById('bookingToTime');
+  if (fromTimeEl) autoFormatTimeInput(fromTimeEl);
+  if (toTimeEl) autoFormatTimeInput(toTimeEl);
+
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('loginId').value.trim();

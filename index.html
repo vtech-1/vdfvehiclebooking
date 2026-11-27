@@ -243,12 +243,12 @@
       </div>
       <div class="row">
         <div class="form-group">
-          <label for="bookingFromTime">From</label>
-          <input type="time" id="bookingFromTime" required />
+          <label for="bookingFromTime">From (HH:MM, 24-hr)</label>
+          <input type="text" id="bookingFromTime" placeholder="e.g. 14:30" pattern="^([01]\d|2[0-3]):[0-5]\d$" inputmode="numeric" maxlength="5" required />
         </div>
         <div class="form-group">
-          <label for="bookingToTime">To</label>
-          <input type="time" id="bookingToTime" required />
+          <label for="bookingToTime">To (HH:MM, 24-hr)</label>
+          <input type="text" id="bookingToTime" placeholder="e.g. 16:00" pattern="^([01]\d|2[0-3]):[0-5]\d$" inputmode="numeric" maxlength="5" required />
         </div>
       </div>
       <div class="form-group">

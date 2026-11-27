@@ -34,7 +34,7 @@ function renderMyBookingCard(b) {
       </div>
       <div class="ticket-card-meta">Date: ${formatDate(b.date)} &middot; ${formatTime(b.fromTime)} - ${formatTime(b.toTime)}</div>
       <div class="ticket-card-meta">People: ${escapeHtml(b.people)}</div>
-      ${b.status === 'Approved' ? `<div class="ticket-card-meta">Vehicle: ${escapeHtml(b.vehicleName || b.vehicleId || '-')} &middot; Driver: ${escapeHtml(b.driverName || b.driverId || '-')}</div>` : ''}
+      ${b.status === 'Approved' ? `<div class="ticket-card-meta">Vehicle: ${escapeHtml(b.vehicleName || vehicleNameFor(b.vehicleId))} &middot; Driver: ${escapeHtml(b.driverName || driverNameFor(b.driverId))}</div>` : ''}
       ${b.status === 'Rejected' && b.rejectReason ? `<div class="ticket-card-meta">Reason: ${escapeHtml(b.rejectReason)}</div>` : ''}
       ${canCancel ? `<div class="ticket-card-actions"><button class="btn btn-danger btn-small" data-cancel-booking="${escapeHtml(b.id)}">Cancel</button></div>` : ''}
     </div>
@@ -59,6 +59,10 @@ async function submitNewBooking() {
 
   if (!date || !fromTime || !toTime || !purpose || !people) {
     showToast('Please fill all fields', 'error');
+    return;
+  }
+  if (!isValidTimeString(fromTime) || !isValidTimeString(toTime)) {
+    showToast('Enter time as HH:MM, e.g. 14:30', 'error');
     return;
   }
   if (date < todayISO()) {

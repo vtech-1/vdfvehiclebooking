@@ -45,6 +45,23 @@ async function runGuarded(actionKey, buttonId, fn) {
   }
 }
 
+// Lets people type a time as plain digits (e.g. "1430") and auto-inserts the
+// colon ("14:30"), so they never have to fight a native time-picker widget.
+function autoFormatTimeInput(inputEl) {
+  inputEl.addEventListener('input', () => {
+    let digits = inputEl.value.replace(/\D/g, '').slice(0, 4);
+    if (digits.length >= 3) {
+      inputEl.value = digits.slice(0, 2) + ':' + digits.slice(2);
+    } else {
+      inputEl.value = digits;
+    }
+  });
+}
+
+function isValidTimeString(value) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || ''));
+}
+
 function sameId(a, b) {
   return String(a) === String(b);
 }
