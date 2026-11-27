@@ -52,31 +52,47 @@ function _nowStamp() {
   return Utilities.formatDate(new Date(), _sheetTimeZone(), 'yyyy-MM-dd HH:mm');
 }
 
-function generateBookingId() {
-  const data = bookingsSheet.getDataRange().getValues();
-  let max = 0;
-  for (let i = 1; i < data.length; i++) {
-    const match = String(data[i][0]).match(/^BK(\d+)$/);
-    if (match) max = Math.max(max, parseInt(match[1], 10));
+// Caches the Bookings sheet's values for the lifetime of one doGet
+// invocation, the same way User.gs caches the Users sheet. Several functions
+// in a single request (e.g. getBookingById then _findApprovalConflict, or
+// generateBookingId then _isDuplicateBooking) would otherwise each re-read
+// the whole sheet.
+let _bookingsDataCache = null;
+
+function _getBookingsData() {
+  if (!_bookingsDataCache) {
+    _bookingsDataCache = bookingsSheet.getDataRange().getValues();
   }
-  return 'BK' + String(max + 1).padStart(4, '0');
+  return _bookingsDataCache;
 }
 
-// Guards against the same employee submitting the same slot twice. Only
-// Pending/Approved bookings block a duplicate; Rejected/Cancelled do not.
-function _isDuplicateBooking(employeeId, date, fromTime, toTime) {
-  const data = bookingsSheet.getDataRange().getValues();
+function _invalidateBookingsCache() {
+  _bookingsDataCache = null;
+}
+
+// Derives the next booking ID and the duplicate-slot check from one shared
+// read of the Bookings sheet, instead of two independent full scans.
+function _nextBookingIdAndDuplicateCheck(employeeId, date, fromTime, toTime) {
+  const data = _getBookingsData();
+  let max = 0;
+  let isDuplicate = false;
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const status = row[8];
-    if (status !== 'Pending' && status !== 'Approved') continue;
-    if (String(row[2]) !== String(employeeId)) continue;
-    if (_formatDateValue(row[3]) !== date) continue;
-    if (_formatTimeValue(row[4]) !== fromTime) continue;
-    if (_formatTimeValue(row[5]) !== toTime) continue;
-    return true;
+    const match = String(row[0]).match(/^BK(\d+)$/);
+    if (match) max = Math.max(max, parseInt(match[1], 10));
+
+    if (!isDuplicate) {
+      const status = row[8];
+      if ((status === 'Pending' || status === 'Approved') &&
+          String(row[2]) === String(employeeId) &&
+          _formatDateValue(row[3]) === date &&
+          _formatTimeValue(row[4]) === fromTime &&
+          _formatTimeValue(row[5]) === toTime) {
+        isDuplicate = true;
+      }
+    }
   }
-  return false;
+  return { bookingId: 'BK' + String(max + 1).padStart(4, '0'), isDuplicate: isDuplicate };
 }
 
 // date is "yyyy-MM-dd", fromTime/toTime are "HH:mm", so string comparison is safe.
@@ -107,16 +123,20 @@ function createBooking(employeeId, employeeName, date, fromTime, toTime, purpose
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    if (_isDuplicateBooking(employeeId, date, fromTime, toTime)) {
+    // Lock acquired after any cached read from an earlier, unrelated part of
+    // this request, so force a fresh read here to see any row written by a
+    // request that held the lock just before us.
+    _invalidateBookingsCache();
+    const { bookingId, isDuplicate } = _nextBookingIdAndDuplicateCheck(employeeId, date, fromTime, toTime);
+    if (isDuplicate) {
       return { success: false, error: 'You already have a booking request for this date and time' };
     }
-
-    const bookingId = generateBookingId();
 
     bookingsSheet.appendRow([
       bookingId, employeeName, employeeId, date, fromTime, toTime, String(purpose).trim(),
       Number(people), 'Pending', '', '', '', _nowStamp(), '', ''
     ]);
+    _invalidateBookingsCache();
 
     logAudit(employeeName, 'CREATE_BOOKING', bookingId, 'New booking request for ' + date);
 
@@ -130,7 +150,7 @@ function createBooking(employeeId, employeeName, date, fromTime, toTime, purpose
 }
 
 function getBookingById(id) {
-  const data = bookingsSheet.getDataRange().getValues();
+  const data = _getBookingsData();
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][0]) === String(id)) {
       return _bookingRowToObject(data[i], i + 1);
@@ -139,26 +159,25 @@ function getBookingById(id) {
   return null;
 }
 
-function getPendingBookings() {
-  const data = bookingsSheet.getDataRange().getValues();
+// Pending and Approved lists are both derived from one shared read of the
+// Bookings sheet (getAdminDashboardData needs both in the same request).
+function _getBookingsByStatus(status) {
+  const data = _getBookingsData();
   const bookings = [];
   for (let i = 1; i < data.length; i++) {
-    if (data[i][8] === 'Pending') {
+    if (data[i][8] === status) {
       bookings.push(_bookingRowToObject(data[i], i + 1));
     }
   }
   return bookings;
 }
 
+function getPendingBookings() {
+  return _getBookingsByStatus('Pending');
+}
+
 function getApprovedBookings() {
-  const data = bookingsSheet.getDataRange().getValues();
-  const bookings = [];
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][8] === 'Approved') {
-      bookings.push(_bookingRowToObject(data[i], i + 1));
-    }
-  }
-  return bookings;
+  return _getBookingsByStatus('Approved');
 }
 
 function _idToNameMap(sheet) {
@@ -171,7 +190,7 @@ function _idToNameMap(sheet) {
 }
 
 function getMyBookings(employeeId) {
-  const data = bookingsSheet.getDataRange().getValues();
+  const data = _getBookingsData();
   const bookings = [];
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][2]) === String(employeeId)) {
@@ -197,7 +216,7 @@ function _timeRangesOverlap(aFrom, aTo, bFrom, bTo) {
 // Checks already-Approved bookings for the same vehicle or driver on the same
 // date with an overlapping time range, excluding the booking being approved.
 function _findApprovalConflict(bookingId, date, fromTime, toTime, vehicleId, driverId) {
-  const data = bookingsSheet.getDataRange().getValues();
+  const data = _getBookingsData();
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (String(row[0]) === String(bookingId)) continue;
@@ -221,6 +240,7 @@ function approveBooking(bookingId, vehicleId, driverId, approvedBy, force) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
+    _invalidateBookingsCache(); // fresh read: another request may have changed rows while we waited for the lock
     const booking = getBookingById(bookingId);
     if (!booking) return { success: false, error: 'Booking not found' };
     if (booking.status !== 'Pending') return { success: false, error: 'Booking is no longer pending' };
@@ -228,11 +248,12 @@ function approveBooking(bookingId, vehicleId, driverId, approvedBy, force) {
     const conflict = _findApprovalConflict(bookingId, booking.date, booking.fromTime, booking.toTime, vehicleId, driverId);
     if (conflict && !force) return { success: false, error: conflict, conflict: true };
 
-    bookingsSheet.getRange(booking.rowIndex, 9).setValue('Approved');
-    bookingsSheet.getRange(booking.rowIndex, 10).setValue(vehicleId);
-    bookingsSheet.getRange(booking.rowIndex, 11).setValue(driverId);
-    bookingsSheet.getRange(booking.rowIndex, 14).setValue(approvedBy);
-    bookingsSheet.getRange(booking.rowIndex, 15).setValue(_nowStamp());
+    // One write instead of 5 separate setValue calls (status, vehicleId,
+    // driverId, approvedBy, approvedDate are columns 9-15 with rejectReason
+    // at 12 left untouched, so write 9-11 and 13-15 as two range writes).
+    bookingsSheet.getRange(booking.rowIndex, 9, 1, 3).setValues([['Approved', vehicleId, driverId]]);
+    bookingsSheet.getRange(booking.rowIndex, 14, 1, 2).setValues([[approvedBy, _nowStamp()]]);
+    _invalidateBookingsCache();
 
     const detail = 'Assigned vehicle ' + vehicleId + ', driver ' + driverId +
       (conflict && force ? ' (OVERRIDE: ' + conflict + ')' : '');
@@ -264,6 +285,7 @@ function endTripEarly(bookingId, endedBy) {
     // the clock; otherwise leave toTime as-is (nothing to shorten).
     if (booking.date === nowDate && nowTime < booking.toTime && nowTime > booking.fromTime) {
       bookingsSheet.getRange(booking.rowIndex, 6).setValue(nowTime);
+      _invalidateBookingsCache();
     }
 
     logAudit(endedBy, 'END_TRIP_EARLY', bookingId, 'Vehicle/driver freed from ' + nowTime);
@@ -283,6 +305,7 @@ function rejectBooking(bookingId, reason, rejectedBy) {
 
     bookingsSheet.getRange(booking.rowIndex, 9).setValue('Rejected');
     bookingsSheet.getRange(booking.rowIndex, 12).setValue(reason);
+    _invalidateBookingsCache();
 
     logAudit(rejectedBy, 'REJECT_BOOKING', bookingId, 'Rejected. Reason: ' + reason);
 
@@ -300,6 +323,7 @@ function cancelBooking(bookingId, cancelledBy) {
     if (booking.status !== 'Pending') return { success: false, error: 'Only pending bookings can be cancelled' };
 
     bookingsSheet.getRange(booking.rowIndex, 9).setValue('Cancelled');
+    _invalidateBookingsCache();
 
     logAudit(cancelledBy, 'CANCEL_BOOKING', bookingId, 'Cancelled by ' + cancelledBy);
 

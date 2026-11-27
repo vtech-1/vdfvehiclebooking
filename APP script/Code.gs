@@ -30,6 +30,13 @@ function requireRole(userId, allowedRoles) {
 // Every response wraps its result in {success, <key>: ...} — the frontend reads
 // result.bookings/vehicles/drivers/employees/user, never a bare array/object.
 function doGet(e) {
+  // Apps Script can reuse the global scope across multiple requests in the
+  // same warm execution context, so the per-request sheet caches in
+  // User.gs/Booking.gs must be reset at the start of every request or a
+  // later request could read stale data left over from an earlier one.
+  _invalidateUsersCache();
+  _invalidateBookingsCache();
+
   const p = e.parameter;
   const action = p.action;
   try {

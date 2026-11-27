@@ -17,8 +17,29 @@ function _userRowToObject(row, rowIndex) {
   };
 }
 
+// Caches the Users sheet's values for the lifetime of one doGet invocation
+// (Apps Script serves each request in its own execution, so this cache never
+// leaks data across requests). requireRole() and a handler that also needs
+// the same user (e.g. updateUser after requireRole already fetched the
+// actor) share this single read instead of each doing their own full scan.
+let _usersDataCache = null;
+
+function _getUsersData() {
+  if (!_usersDataCache) {
+    _usersDataCache = usersSheet.getDataRange().getValues();
+  }
+  return _usersDataCache;
+}
+
+// Call after any write to the Users sheet (createUser/updateUser/
+// deactivateUser/changePassword) so a later read in the same request sees
+// the fresh data instead of the pre-write cache.
+function _invalidateUsersCache() {
+  _usersDataCache = null;
+}
+
 function getUserById(id) {
-  const data = usersSheet.getDataRange().getValues();
+  const data = _getUsersData();
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][0]) === String(id)) {
       return _userRowToObject(data[i], i + 1);
@@ -28,7 +49,7 @@ function getUserById(id) {
 }
 
 function getEmployees() {
-  const data = usersSheet.getDataRange().getValues();
+  const data = _getUsersData();
   const employees = [];
   for (let i = 1; i < data.length; i++) {
     const user = _userRowToObject(data[i], i + 1);
@@ -67,12 +88,14 @@ function changePassword(id, oldPassword, newPassword) {
   }
   usersSheet.getRange(user.rowIndex, 3).setValue(_hashPassword(newPassword));
   usersSheet.getRange(user.rowIndex, 5).setValue(false);
+  _invalidateUsersCache();
   return { success: true };
 }
 
 function createUser(id, name, role, contact, telegramId) {
   if (getUserById(id)) return { success: false, error: 'User ID already exists' };
   usersSheet.appendRow([id, name, _hashPassword(String(id)), role, true, contact || '', telegramId || '', true]);
+  _invalidateUsersCache();
   return { success: true, id: id };
 }
 
@@ -85,6 +108,7 @@ function updateUser(id, fields) {
       usersSheet.getRange(user.rowIndex, colMap[key]).setValue(fields[key]);
     }
   });
+  _invalidateUsersCache();
   return { success: true };
 }
 
@@ -92,5 +116,6 @@ function deactivateUser(id) {
   const user = getUserById(id);
   if (!user) return { success: false, error: 'User not found' };
   usersSheet.getRange(user.rowIndex, 8).setValue(false);
+  _invalidateUsersCache();
   return { success: true };
 }
