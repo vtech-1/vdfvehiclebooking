@@ -337,8 +337,9 @@ textarea {
   color: var(--white);
 }
 
-/* On wider screens, show the admin nav as a proper left sidebar instead of a
-   horizontal scroll strip. */
+/* On wider screens, show the admin nav as one cohesive sidebar panel (card
+   with a merged button list) instead of a horizontal scroll strip of
+   separate floating buttons. */
 @media (min-width: 900px) {
   .admin-layout {
     max-width: 1100px;
@@ -354,10 +355,34 @@ textarea {
     top: 16px;
     margin-bottom: 0;
     overflow-x: visible;
+    gap: 0;
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    padding: 8px;
   }
 
   .admin-tab-btn {
     width: 100%;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .admin-tab-btn + .admin-tab-btn {
+    margin-top: 2px;
+  }
+
+  .admin-tab-btn:hover:not(.active) {
+    background: var(--gray-bg);
+  }
+
+  .admin-tab-btn.active {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   }
 
   .admin-content {
