@@ -13,16 +13,6 @@
   padding-bottom: 80px;
 }
 
-body.page-is-admin .container {
-  max-width: 480px;
-}
-
-@media (min-width: 900px) {
-  body.page-is-admin .container {
-    max-width: 1100px;
-  }
-}
-
 .header {
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: var(--white);
@@ -309,12 +299,23 @@ textarea {
   background: var(--primary-dark);
 }
 
-/* Tabs */
-.tab-bar {
+/* Admin layout: sidebar nav + content area */
+.admin-layout {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+  padding-bottom: 80px;
+}
+
+.admin-sidebar {
   display: flex;
   gap: 6px;
   margin-bottom: 16px;
   overflow-x: auto;
+}
+
+.admin-content {
+  min-width: 0;
 }
 
 .admin-tab-btn {
@@ -327,12 +328,41 @@ textarea {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  text-align: left;
 }
 
 .admin-tab-btn.active {
   background: var(--primary);
   border-color: var(--primary);
   color: var(--white);
+}
+
+/* On wider screens, show the admin nav as a proper left sidebar instead of a
+   horizontal scroll strip. */
+@media (min-width: 900px) {
+  .admin-layout {
+    max-width: 1100px;
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+  }
+
+  .admin-sidebar {
+    flex-direction: column;
+    flex: 0 0 220px;
+    position: sticky;
+    top: 16px;
+    margin-bottom: 0;
+    overflow-x: visible;
+  }
+
+  .admin-tab-btn {
+    width: 100%;
+  }
+
+  .admin-content {
+    flex: 1;
+  }
 }
 
 .admin-tab-panel {

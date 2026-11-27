@@ -22,7 +22,7 @@ function closeModal(modalId) {
 }
 
 function switchAdminTab(tabBtn, panelId) {
-  const bar = tabBtn.closest('.tab-bar');
+  const bar = tabBtn.closest('.admin-sidebar');
   bar.querySelectorAll('.admin-tab-btn').forEach((b) => b.classList.remove('active'));
   tabBtn.classList.add('active');
   const panelGroup = document.getElementById(panelId).parentElement;
