@@ -123,20 +123,21 @@
 
     <div class="admin-content">
     <div class="admin-tab-panel active" id="dashboardPanel">
+      <div class="admin-page-title">Dashboard</div>
       <div class="stat-grid">
-        <div class="stat-tile">
+        <div class="stat-tile stat-tile-amber">
           <div class="stat-tile-value" id="statPendingCount">0</div>
           <div class="stat-tile-label">Pending Requests</div>
         </div>
-        <div class="stat-tile">
+        <div class="stat-tile stat-tile-green">
           <div class="stat-tile-value" id="statTodayTripsCount">0</div>
           <div class="stat-tile-label">Today's Approved Trips</div>
         </div>
-        <div class="stat-tile">
+        <div class="stat-tile stat-tile-blue">
           <div class="stat-tile-value" id="statActiveVehiclesCount">0</div>
           <div class="stat-tile-label">Active Vehicles</div>
         </div>
-        <div class="stat-tile">
+        <div class="stat-tile stat-tile-purple">
           <div class="stat-tile-value" id="statActiveDriversCount">0</div>
           <div class="stat-tile-label">Active Drivers</div>
         </div>
@@ -148,10 +149,12 @@
     </div>
 
     <div class="admin-tab-panel" id="fleetPendingPanel">
+      <div class="admin-page-title">Pending Requests</div>
       <div id="pendingBookingsList"></div>
     </div>
 
     <div class="admin-tab-panel" id="fleetApprovedPanel">
+      <div class="admin-page-title">Approved Bookings</div>
       <button class="btn btn-secondary btn-small" id="downloadApprovedReportBtn" style="margin-bottom:12px;">Download Report (Excel)</button>
       <div id="approvedBookingsList"></div>
     </div>
