@@ -120,7 +120,7 @@ function doGet(e) {
       case 'approveBooking': {
         const auth = requireRole(p.actorId, ['fleetmanager', 'admin']);
         if (!auth.success) return jsonResponse(auth);
-        return jsonResponse(approveBooking(p.bookingId, p.vehicleId, p.driverId, auth.user.name));
+        return jsonResponse(approveBooking(p.bookingId, p.vehicleId, p.driverId, auth.user.name, p.force === 'true'));
       }
       case 'endTripEarly': {
         const auth = requireRole(p.actorId, ['fleetmanager', 'admin']);

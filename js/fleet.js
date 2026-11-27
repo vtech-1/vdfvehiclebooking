@@ -192,6 +192,38 @@ async function openApprovalModal(bookingId) {
   openModal('approvalModal');
 }
 
+// Returns the server result so the caller can decide whether to retry with
+// force (kept outside runGuarded so a retry isn't blocked by its own guard).
+async function _callApproveBooking(bookingId, vehicleId, driverId, force) {
+  let result;
+  await runGuarded('approveBooking', 'approvalConfirmBtn', async () => {
+    result = await apiPost('approveBooking', {
+      actorId: STATE.currentUser.id,
+      bookingId,
+      vehicleId,
+      driverId,
+      force: force ? 'true' : 'false'
+    });
+  });
+  return result;
+}
+
+function _applyApprovedBookingToState(bookingId, vehicleId, driverId) {
+  const idx = STATE.pendingBookings.findIndex((b) => sameId(b.id, bookingId));
+  if (idx !== -1) {
+    const [booking] = STATE.pendingBookings.splice(idx, 1);
+    booking.status = 'Approved';
+    booking.vehicleId = vehicleId;
+    booking.driverId = driverId;
+    STATE.approvedBookings.push(booking);
+  }
+  renderPendingBookings();
+  renderApprovedBookings();
+  updatePendingCountBadge();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  if (typeof renderUtilization === 'function') renderUtilization();
+}
+
 async function submitApproval() {
   const bookingId = STATE.activeApprovalBookingId;
   const vehicleId = document.getElementById('approveVehicleSelect').value;
@@ -202,34 +234,26 @@ async function submitApproval() {
     return;
   }
 
-  await runGuarded('approveBooking', 'approvalConfirmBtn', async () => {
-    const result = await apiPost('approveBooking', {
-      actorId: STATE.currentUser.id,
-      bookingId,
-      vehicleId,
-      driverId
-    });
+  let result = await _callApproveBooking(bookingId, vehicleId, driverId, false);
+  if (!result) return; // guarded call was skipped (already in flight)
 
-    if (result.success) {
-      showToast('Booking approved', 'success');
-      closeModal('approvalModal');
-      const idx = STATE.pendingBookings.findIndex((b) => sameId(b.id, bookingId));
-      if (idx !== -1) {
-        const [booking] = STATE.pendingBookings.splice(idx, 1);
-        booking.status = 'Approved';
-        booking.vehicleId = vehicleId;
-        booking.driverId = driverId;
-        STATE.approvedBookings.push(booking);
-      }
-      renderPendingBookings();
-      renderApprovedBookings();
-      updatePendingCountBadge();
-      if (typeof renderDashboard === 'function') renderDashboard();
-      if (typeof renderUtilization === 'function') renderUtilization();
-    } else {
-      showToast(result.error || 'Could not approve booking', 'error');
-    }
-  });
+  if (!result.success && result.conflict) {
+    const ok = confirm(
+      (result.error || 'This vehicle/driver may already be booked for an overlapping time.') +
+      '\n\nOnly approve this if you have personally confirmed the vehicle and driver are actually free right now.\n\nApprove anyway?'
+    );
+    if (!ok) return;
+    result = await _callApproveBooking(bookingId, vehicleId, driverId, true);
+    if (!result) return;
+  }
+
+  if (result.success) {
+    showToast('Booking approved', 'success');
+    closeModal('approvalModal');
+    _applyApprovedBookingToState(bookingId, vehicleId, driverId);
+  } else {
+    showToast(result.error || 'Could not approve booking', 'error');
+  }
 }
 
 function openRejectionModal(bookingId) {

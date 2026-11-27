@@ -212,7 +212,12 @@ function _findApprovalConflict(bookingId, date, fromTime, toTime, vehicleId, dri
   return null;
 }
 
-function approveBooking(bookingId, vehicleId, driverId, approvedBy) {
+// force=true skips the overlap check. Used when a manager has personally
+// confirmed a vehicle/driver is actually free despite what the recorded
+// booking times say (e.g. a trip that returned early but the booking end
+// time wasn't updated to the exact minute). Always logged either way so
+// there's a trail of when the check was overridden.
+function approveBooking(bookingId, vehicleId, driverId, approvedBy, force) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -221,7 +226,7 @@ function approveBooking(bookingId, vehicleId, driverId, approvedBy) {
     if (booking.status !== 'Pending') return { success: false, error: 'Booking is no longer pending' };
 
     const conflict = _findApprovalConflict(bookingId, booking.date, booking.fromTime, booking.toTime, vehicleId, driverId);
-    if (conflict) return { success: false, error: conflict };
+    if (conflict && !force) return { success: false, error: conflict, conflict: true };
 
     bookingsSheet.getRange(booking.rowIndex, 9).setValue('Approved');
     bookingsSheet.getRange(booking.rowIndex, 10).setValue(vehicleId);
@@ -229,7 +234,9 @@ function approveBooking(bookingId, vehicleId, driverId, approvedBy) {
     bookingsSheet.getRange(booking.rowIndex, 14).setValue(approvedBy);
     bookingsSheet.getRange(booking.rowIndex, 15).setValue(_nowStamp());
 
-    logAudit(approvedBy, 'APPROVE_BOOKING', bookingId, 'Assigned vehicle ' + vehicleId + ', driver ' + driverId);
+    const detail = 'Assigned vehicle ' + vehicleId + ', driver ' + driverId +
+      (conflict && force ? ' (OVERRIDE: ' + conflict + ')' : '');
+    logAudit(approvedBy, 'APPROVE_BOOKING', bookingId, detail);
 
     return { success: true, message: 'Booking approved' };
   } catch (error) {
