@@ -64,7 +64,13 @@ function renderApprovedBookings() {
     list.innerHTML = '<div class="empty-state">No approved bookings.</div>';
     return;
   }
-  const rows = [...STATE.approvedBookings].sort(compareByDateTime).map((b) => `
+  const today = todayISO();
+  const nowTime = new Date().toTimeString().slice(0, 5);
+  const rows = [...STATE.approvedBookings].sort(compareByDateTime).map((b) => {
+    // "End Trip" only makes sense for a trip that is today and currently in
+    // progress by the clock (started, not yet at its booked end time).
+    const canEndTrip = b.date === today && nowTime > b.fromTime && nowTime < b.toTime;
+    return `
     <tr>
       <td>${escapeHtml(b.employeeName)}</td>
       <td>${formatDate(b.date)}</td>
@@ -72,18 +78,45 @@ function renderApprovedBookings() {
       <td>${escapeHtml(b.purpose)}</td>
       <td>${escapeHtml(vehicleNameFor(b.vehicleId))}</td>
       <td>${escapeHtml(driverNameFor(b.driverId))}</td>
+      <td>${canEndTrip ? `<button class="btn btn-small btn-secondary" data-end-trip="${escapeHtml(b.id)}">End Trip</button>` : '-'}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
   list.innerHTML = `
     <div class="table-wrap">
       <table class="records-table">
         <thead>
-          <tr><th>Employee</th><th>Date</th><th>Time</th><th>Purpose</th><th>Vehicle</th><th>Driver</th></tr>
+          <tr><th>Employee</th><th>Date</th><th>Time</th><th>Purpose</th><th>Vehicle</th><th>Driver</th><th>Vehicle Returned?</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
   `;
+}
+
+// Manager confirms the vehicle physically returned before its booked end
+// time, so it (and the driver) become free for a new booking starting now.
+async function submitEndTripEarly(bookingId) {
+  await runGuarded('endTripEarly:' + bookingId, null, async () => {
+    const result = await apiPost('endTripEarly', {
+      actorId: STATE.currentUser.id,
+      bookingId
+    });
+    if (result.success) {
+      showToast(result.message || 'Trip ended. Vehicle is now free.', 'success');
+      const booking = STATE.approvedBookings.find((b) => sameId(b.id, bookingId));
+      if (booking) {
+        const nowTime = new Date().toTimeString().slice(0, 5);
+        if (booking.date === todayISO() && nowTime > booking.fromTime && nowTime < booking.toTime) {
+          booking.toTime = nowTime;
+        }
+      }
+      renderApprovedBookings();
+      if (typeof renderUtilization === 'function') renderUtilization();
+    } else {
+      showToast(result.error || 'Could not end trip', 'error');
+    }
+  });
 }
 
 function _csvEscape(value) {

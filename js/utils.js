@@ -62,6 +62,19 @@ function isValidTimeString(value) {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || ''));
 }
 
+// Validates a 12-hour "HH:MM" typed value (hour 1-12, minute 00-59).
+function isValid12HourTime(value) {
+  return /^(0?[1-9]|1[0-2]):[0-5]\d$/.test(String(value || '').trim());
+}
+
+// Converts a 12-hour "H:MM"/"HH:MM" + "AM"/"PM" pair into 24-hour "HH:MM".
+function to24HourTime(value, ampm) {
+  const [hStr, mStr] = String(value).trim().split(':');
+  let h = parseInt(hStr, 10) % 12;
+  if (String(ampm).toUpperCase() === 'PM') h += 12;
+  return String(h).padStart(2, '0') + ':' + mStr;
+}
+
 function sameId(a, b) {
   return String(a) === String(b);
 }

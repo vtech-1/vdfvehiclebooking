@@ -122,6 +122,11 @@ function doGet(e) {
         if (!auth.success) return jsonResponse(auth);
         return jsonResponse(approveBooking(p.bookingId, p.vehicleId, p.driverId, auth.user.name));
       }
+      case 'endTripEarly': {
+        const auth = requireRole(p.actorId, ['fleetmanager', 'admin']);
+        if (!auth.success) return jsonResponse(auth);
+        return jsonResponse(endTripEarly(p.bookingId, auth.user.name));
+      }
       case 'rejectBooking': {
         const auth = requireRole(p.actorId, ['fleetmanager', 'admin']);
         if (!auth.success) return jsonResponse(auth);

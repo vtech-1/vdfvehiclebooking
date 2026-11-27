@@ -240,6 +240,34 @@ function approveBooking(bookingId, vehicleId, driverId, approvedBy) {
   }
 }
 
+// Manager marks a trip as physically returned early. Shortens the booking's
+// toTime to the actual return time so the vehicle/driver become free for any
+// new booking that starts after that time (the overlap check in
+// _findApprovalConflict compares against this same toTime).
+function endTripEarly(bookingId, endedBy) {
+  try {
+    const booking = getBookingById(bookingId);
+    if (!booking) return { success: false, error: 'Booking not found' };
+    if (booking.status !== 'Approved') return { success: false, error: 'Only approved trips can be ended' };
+
+    const nowDate = Utilities.formatDate(new Date(), _sheetTimeZone(), 'yyyy-MM-dd');
+    const nowTime = Utilities.formatDate(new Date(), _sheetTimeZone(), 'HH:mm');
+
+    // Only shorten if the trip is today and actually still "in progress" by
+    // the clock; otherwise leave toTime as-is (nothing to shorten).
+    if (booking.date === nowDate && nowTime < booking.toTime && nowTime > booking.fromTime) {
+      bookingsSheet.getRange(booking.rowIndex, 6).setValue(nowTime);
+    }
+
+    logAudit(endedBy, 'END_TRIP_EARLY', bookingId, 'Vehicle/driver freed from ' + nowTime);
+
+    return { success: true, message: 'Trip ended. Vehicle and driver are now free.' };
+  } catch (error) {
+    logAudit('System', 'ERROR', bookingId, error.toString());
+    return { success: false, error: error.toString() };
+  }
+}
+
 function rejectBooking(bookingId, reason, rejectedBy) {
   try {
     const booking = getBookingById(bookingId);

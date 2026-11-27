@@ -52,19 +52,23 @@ async function submitNewBooking() {
 
   const user = STATE.currentUser;
   const date = document.getElementById('bookingDate').value;
-  const fromTime = document.getElementById('bookingFromTime').value;
-  const toTime = document.getElementById('bookingToTime').value;
+  const fromTimeRaw = document.getElementById('bookingFromTime').value;
+  const toTimeRaw = document.getElementById('bookingToTime').value;
+  const fromAmPm = document.getElementById('bookingFromAmPm').value;
+  const toAmPm = document.getElementById('bookingToAmPm').value;
   const purpose = document.getElementById('bookingPurpose').value.trim();
   const people = document.getElementById('bookingPeople').value;
 
-  if (!date || !fromTime || !toTime || !purpose || !people) {
+  if (!date || !fromTimeRaw || !toTimeRaw || !purpose || !people) {
     showToast('Please fill all fields', 'error');
     return;
   }
-  if (!isValidTimeString(fromTime) || !isValidTimeString(toTime)) {
-    showToast('Enter time as HH:MM, e.g. 14:30', 'error');
+  if (!isValid12HourTime(fromTimeRaw) || !isValid12HourTime(toTimeRaw)) {
+    showToast('Enter time as HH:MM, e.g. 02:30', 'error');
     return;
   }
+  const fromTime = to24HourTime(fromTimeRaw, fromAmPm);
+  const toTime = to24HourTime(toTimeRaw, toAmPm);
   if (date < todayISO()) {
     showToast('Booking date cannot be in the past', 'error');
     return;

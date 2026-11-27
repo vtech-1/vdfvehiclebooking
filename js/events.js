@@ -82,6 +82,14 @@ function bindEvents() {
   const downloadApprovedReportBtn = document.getElementById('downloadApprovedReportBtn');
   if (downloadApprovedReportBtn) downloadApprovedReportBtn.addEventListener('click', downloadApprovedBookingsReport);
 
+  const approvedBookingsList = document.getElementById('approvedBookingsList');
+  if (approvedBookingsList) {
+    approvedBookingsList.addEventListener('click', (e) => {
+      const endTripBtn = e.target.closest('[data-end-trip]');
+      if (endTripBtn) submitEndTripEarly(endTripBtn.dataset.endTrip);
+    });
+  }
+
   const rejectionConfirmBtn = document.getElementById('rejectionConfirmBtn');
   if (rejectionConfirmBtn) rejectionConfirmBtn.addEventListener('click', submitRejection);
 
